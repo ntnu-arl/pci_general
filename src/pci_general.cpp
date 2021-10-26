@@ -3,8 +3,8 @@
 namespace explorer {
 
 PCIGeneral::PCIGeneral(const ros::NodeHandle& nh,
-                               const ros::NodeHandle& nh_private)
-  : PCIManager(nh, nh_private), ac_("pci_output_path", true) {
+                       const ros::NodeHandle& nh_private)
+    : PCIManager(nh, nh_private), ac_("pci_output_path", true) {
   trajectory_pub_ = nh_.advertise<trajectory_msgs::MultiDOFJointTrajectory>(
       mav_msgs::default_topics::COMMAND_TRAJECTORY, 10);
   path_pub_ = nh_.advertise<geometry_msgs::PoseArray>("pci_command_path", 10);
@@ -25,8 +25,9 @@ bool PCIGeneral::initialize() {
   } else {
     ROS_ERROR("PCIGeneral::initialize --> Not support.");
   }
-  if(output_type_ == OutputType::kTopic) {
-     execution_timer_ = nh_.createTimer(ros::Duration(0.2), &PCIGeneral::executionTimerCallback, this);
+  if (output_type_ == OutputType::kTopic) {
+    execution_timer_ = nh_.createTimer(
+        ros::Duration(0.2), &PCIGeneral::executionTimerCallback, this);
   }
   return true;
 }
@@ -40,7 +41,7 @@ bool PCIGeneral::initMotion() {
 
   std::vector<geometry_msgs::Pose> init_path, exec_path;
   ROS_INFO("Robot type: %d", (int)robot_type_);
-  if(robot_type_ == RobotType::kAerial) {
+  if (robot_type_ == RobotType::kAerial) {
     {
       geometry_msgs::Pose pose;
       pose.position.x = current_pose_.position.x;
@@ -67,7 +68,8 @@ bool PCIGeneral::initMotion() {
       geometry_msgs::Pose pose;
       pose.position.x = current_pose_.position.x;
       pose.position.y = current_pose_.position.y;
-      pose.position.z = current_pose_.position.z + init_z_takeoff_ - init_z_drop_;
+      pose.position.z =
+          current_pose_.position.z + init_z_takeoff_ - init_z_drop_;
       pose.orientation.x = 0;
       pose.orientation.y = 0;
       pose.orientation.z = 0;
@@ -78,15 +80,15 @@ bool PCIGeneral::initMotion() {
       geometry_msgs::Pose pose;
       pose.position.x = current_pose_.position.x + init_x_forward_;
       pose.position.y = current_pose_.position.y;
-      pose.position.z = current_pose_.position.z + init_z_takeoff_ - init_z_drop_;
+      pose.position.z =
+          current_pose_.position.z + init_z_takeoff_ - init_z_drop_;
       pose.orientation.x = 0;
       pose.orientation.y = 0;
       pose.orientation.z = 0;
       pose.orientation.w = 1;
       init_path.push_back(pose);
     }
-  }
-  else {
+  } else {
     {
       geometry_msgs::Pose pose;
       pose.position.x = current_pose_.position.x;
@@ -115,7 +117,7 @@ bool PCIGeneral::initMotion() {
 }
 
 visualization_msgs::MarkerArray::Ptr PCIGeneral::generateTrajectoryMarkerArray(
-    const trajectory_msgs::MultiDOFJointTrajectory &traj) const {
+    const trajectory_msgs::MultiDOFJointTrajectory& traj) const {
   auto m_arr = boost::make_shared<visualization_msgs::MarkerArray>();
 
   visualization_msgs::Marker me;
@@ -165,17 +167,17 @@ visualization_msgs::MarkerArray::Ptr PCIGeneral::generateTrajectoryMarkerArray(
   mo.frame_locked = false;
 
   for (size_t i = 0; i < traj.points.size() - 1; ++i) {
-    if(!m_arr->markers.empty()) {
+    if (!m_arr->markers.empty()) {
       ++me.id;
       ++mo.id;
     }
     auto ti_v3 = traj.points.at(i).transforms.at(0).translation;
     auto tip1_v3 = traj.points.at(i + 1).transforms.at(0).translation;
-    auto &me_p0 = me.points.at(0);
+    auto& me_p0 = me.points.at(0);
     me_p0.x = ti_v3.x;
     me_p0.y = ti_v3.y;
     me_p0.z = ti_v3.z;
-    auto &me_p1 = me.points.at(1);
+    auto& me_p1 = me.points.at(1);
     me_p1.x = tip1_v3.x;
     me_p1.y = tip1_v3.y;
     me_p1.z = tip1_v3.z;
@@ -191,7 +193,7 @@ visualization_msgs::MarkerArray::Ptr PCIGeneral::generateTrajectoryMarkerArray(
     mo.pose.orientation.w = ti_q.w;
     m_arr->markers.push_back(mo);
   }
-  if(!m_arr->markers.empty()) {
+  if (!m_arr->markers.empty()) {
     ++mo.id;
   }
   auto tb_v3 = traj.points.back().transforms.at(0).translation;
@@ -208,7 +210,8 @@ visualization_msgs::MarkerArray::Ptr PCIGeneral::generateTrajectoryMarkerArray(
   return m_arr;
 }
 
-visualization_msgs::MarkerArray::Ptr PCIGeneral::generateTrajectoryMarkerArray(const std::vector<geometry_msgs::Pose>& traj) const {
+visualization_msgs::MarkerArray::Ptr PCIGeneral::generateTrajectoryMarkerArray(
+    const std::vector<geometry_msgs::Pose>& traj) const {
   auto m_arr = boost::make_shared<visualization_msgs::MarkerArray>();
 
   visualization_msgs::Marker me;
@@ -255,31 +258,47 @@ visualization_msgs::MarkerArray::Ptr PCIGeneral::generateTrajectoryMarkerArray(c
   mo.lifetime = ros::Duration(0.0);
   mo.frame_locked = false;
 
-  for(size_t i = 0; i < traj.size()-1; ++i) {
-    m_arr->markers.empty() ? : ++me.id, ++mo.id;
+  for (size_t i = 0; i < traj.size() - 1; ++i) {
+    m_arr->markers.empty() ?: ++me.id, ++mo.id;
     auto ti_v3 = traj.at(i).position;
-    auto tip1_v3 = traj.at(i+1).position;
-    auto & me_p0 = me.points.at(0); me_p0.x=ti_v3.x; me_p0.y=ti_v3.y; me_p0.z=ti_v3.z;
-    auto & me_p1 = me.points.at(1); me_p1.x=tip1_v3.x; me_p1.y=tip1_v3.y; me_p1.z=tip1_v3.z;
+    auto tip1_v3 = traj.at(i + 1).position;
+    auto& me_p0 = me.points.at(0);
+    me_p0.x = ti_v3.x;
+    me_p0.y = ti_v3.y;
+    me_p0.z = ti_v3.z;
+    auto& me_p1 = me.points.at(1);
+    me_p1.x = tip1_v3.x;
+    me_p1.y = tip1_v3.y;
+    me_p1.z = tip1_v3.z;
     m_arr->markers.push_back(me);
 
-    mo.pose.position.x=ti_v3.x; mo.pose.position.y=ti_v3.y; mo.pose.position.z=ti_v3.z;
+    mo.pose.position.x = ti_v3.x;
+    mo.pose.position.y = ti_v3.y;
+    mo.pose.position.z = ti_v3.z;
     auto ti_q = traj.at(i).orientation;
-    mo.pose.orientation.x=ti_q.x; mo.pose.orientation.y=ti_q.y; mo.pose.orientation.z=ti_q.z; mo.pose.orientation.w=ti_q.w;
+    mo.pose.orientation.x = ti_q.x;
+    mo.pose.orientation.y = ti_q.y;
+    mo.pose.orientation.z = ti_q.z;
+    mo.pose.orientation.w = ti_q.w;
     m_arr->markers.push_back(mo);
   }
-  m_arr->markers.empty() ? : ++mo.id;
+  m_arr->markers.empty() ?: ++mo.id;
   auto tb_v3 = traj.back().position;
-  mo.pose.position.x=tb_v3.x; mo.pose.position.y=tb_v3.y; mo.pose.position.z=tb_v3.z;
+  mo.pose.position.x = tb_v3.x;
+  mo.pose.position.y = tb_v3.y;
+  mo.pose.position.z = tb_v3.z;
   auto tb_q = traj.back().orientation;
-  mo.pose.orientation.x=tb_q.x; mo.pose.orientation.y=tb_q.y; mo.pose.orientation.z=tb_q.z; mo.pose.orientation.w=tb_q.w;
+  mo.pose.orientation.x = tb_q.x;
+  mo.pose.orientation.y = tb_q.y;
+  mo.pose.orientation.z = tb_q.z;
+  mo.pose.orientation.w = tb_q.w;
   m_arr->markers.push_back(mo);
 
   return m_arr;
 }
 
-bool PCIGeneral::goToWaypoint(geometry_msgs::Pose &pose) {
-	ROS_WARN("Going to waypoint.");
+bool PCIGeneral::goToWaypoint(geometry_msgs::Pose& pose) {
+  ROS_WARN("Going to waypoint.");
   // From current pose to the target pose.
   std::vector<geometry_msgs::Pose> path{current_pose_, pose};
   std::vector<geometry_msgs::Pose> path_to_exe;
@@ -287,14 +306,13 @@ bool PCIGeneral::goToWaypoint(geometry_msgs::Pose &pose) {
   return true;
 }
 
-bool PCIGeneral::executePath(
-    const std::vector<geometry_msgs::Pose> &path,
-		 std::vector<geometry_msgs::Pose> &modified_path,
-		 ExecutionPathType path_type) {
+bool PCIGeneral::executePath(const std::vector<geometry_msgs::Pose>& path,
+                             std::vector<geometry_msgs::Pose>& modified_path,
+                             ExecutionPathType path_type) {
   if (path.size() == 0) return false;
   std::vector<geometry_msgs::Pose> path_new = path;
 
-  if(path_type != ExecutionPathType::kManualPath) {
+  if (path_type != ExecutionPathType::kManualPath) {
     // Only modify for path derived from auto mode.
     // Extend the path to current position if necessary to achieve better
     // transition.
@@ -313,18 +331,17 @@ bool PCIGeneral::executePath(
   }
 
   // const bool turn_yaw_first = homing_yaw_allocation_enable_ &&
-  //                           ((path_type == ExecutionPathType::kHomingPath) || (path_type == ExecutionPathType::kGlobalPath));
+  //                           ((path_type == ExecutionPathType::kHomingPath) ||
+  //                           (path_type == ExecutionPathType::kGlobalPath));
   // if (turn_yaw_first) {
   //   allocateYawAlongFistSegment(path_new);
   // }
-	
-	
-	if(path_new.size() > 1) {
-		std::vector<geometry_msgs::Pose> path_interp;
-		interpolatePath(path_new, path_interp);
-		path_new = path_interp;
-	}
-  
+
+  if (path_new.size() > 1) {
+    std::vector<geometry_msgs::Pose> path_interp;
+    interpolatePath(path_new, path_interp);
+    path_new = path_interp;
+  }
 
   // Store the current path
   executing_path_ = path_new;
@@ -333,7 +350,7 @@ bool PCIGeneral::executePath(
 
   // Execute the path: same interface for both simulation and real system.
   if ((run_mode_ == RunModeType::kSim) || (run_mode_ == RunModeType::kReal)) {
-    if(output_type_ == OutputType::kTopic) {
+    if (output_type_ == OutputType::kTopic) {
       n_seq_++;
       // std::vector<geometry_msgs::Pose> path_intp;
       // interpolatePath(path_new, path_new);
@@ -359,16 +376,16 @@ bool PCIGeneral::executePath(
         samples_array_.points.push_back(trajectory_point_msg_);
         command_path.poses.push_back(path_new[i]);
       }
-      trajectory_vis_pub_.publish(generateTrajectoryMarkerArray(samples_array_));
+      trajectory_vis_pub_.publish(
+          generateTrajectoryMarkerArray(samples_array_));
       trajectory_pub_.publish(samples_array_);
       path_pub_.publish(command_path);
       pci_status_ = PCIStatus::kRunning;
-    }
-    else if(output_type_ == OutputType::kAction) {  
+    } else if (output_type_ == OutputType::kAction) {
       // Prepare to send goals to the action.
       planner_msgs::pathFollowerActionGoal goal;
       std::vector<geometry_msgs::PoseStamped> path_stamped;
-      for(auto &p : path_new) {
+      for (auto& p : path_new) {
         geometry_msgs::PoseStamped ps;
         ps.pose = p;
         path_stamped.push_back(ps);
@@ -376,16 +393,15 @@ bool PCIGeneral::executePath(
       goal.path = path_stamped;
 
       ROS_INFO("Going to send the goal");
-      if(ac_.waitForServer(ros::Duration(kServerWatingTimeout)))
-      {
+      if (ac_.waitForServer(ros::Duration(kServerWatingTimeout))) {
         trajectory_vis_pub_.publish(generateTrajectoryMarkerArray(path_new));
-        ac_.sendGoal(goal, boost::bind(&PCIGeneral::actionDoneCallback, this, _1, _2),
+        ac_.sendGoal(
+            goal, boost::bind(&PCIGeneral::actionDoneCallback, this, _1, _2),
             boost::bind(&PCIGeneral::actionActiveCallback, this),
             boost::bind(&PCIGeneral::actionFeedbackCallback, this, _1));
         pci_status_ = PCIStatus::kRunning;
         ROS_INFO("Goal sent.");
-      }
-      else {
+      } else {
         ROS_ERROR("It was not possible to send path to action server.");
       }
     }
@@ -395,9 +411,8 @@ bool PCIGeneral::executePath(
   return true;
 }
 
-
-bool PCIGeneral::reconnectPath(const std::vector<geometry_msgs::Pose> &path,
-                                 std::vector<geometry_msgs::Pose> &path_new) {
+bool PCIGeneral::reconnectPath(const std::vector<geometry_msgs::Pose>& path,
+                               std::vector<geometry_msgs::Pose>& path_new) {
   path_new = path;
 
   // Extend the path to current position if necessary to achieve better
@@ -446,7 +461,8 @@ bool PCIGeneral::reconnectPath(const std::vector<geometry_msgs::Pose> &path,
       // Check if current pos belongs to any segment.
       int exe_path_size = executing_path_.size();
       for (int ind = exe_path_size - 1; ind > 0; --ind) {
-        if (calculateDistance(executing_path_[ind - 1], current_pose_) < kLimLow) {
+        if (calculateDistance(executing_path_[ind - 1], current_pose_) <
+            kLimLow) {
           path_new.insert(path_new.begin(), current_pose_);
           reconnect_ok = true;
           break;
@@ -484,22 +500,25 @@ bool PCIGeneral::reconnectPath(const std::vector<geometry_msgs::Pose> &path,
   }
 }
 
-void PCIGeneral::allocateYawAlongFistSegment(std::vector<geometry_msgs::Pose> &path) const {
+void PCIGeneral::allocateYawAlongFistSegment(
+    std::vector<geometry_msgs::Pose>& path) const {
   // Return if only one vertex or less.
   if (path.size() <= 1) return;
   // Assign heading on first segment only
-  // BUT: Make sure we don't consider a micro-segment for orientation calculation
-  for (int i=1; i<path.size(); ++i) {
+  // BUT: Make sure we don't consider a micro-segment for orientation
+  // calculation
+  for (int i = 1; i < path.size(); ++i) {
     Eigen::Vector3d dir_vec;
     dir_vec << path[i].position.x - path[i - 1].position.x,
         path[i].position.y - path[i - 1].position.y,
         path[i].position.z - path[i - 1].position.z;
-    if (dir_vec.norm()>0.5) { //TODO: Make parameter for this value (control how big a micro-segment is)
+    if (dir_vec.norm() > 0.5) {  // TODO: Make parameter for this value (control
+                                 // how big a micro-segment is)
       double yaw_first = std::atan2(path[i].position.y - path[0].position.y,
                                     path[i].position.x - path[0].position.x);
       tf::Quaternion quat;
       quat.setEuler(0.0, 0.0, yaw_first);
-      for (--i; i>=0; --i) {
+      for (--i; i >= 0; --i) {
         path[i].orientation.x = quat.x();
         path[i].orientation.y = quat.y();
         path[i].orientation.z = quat.z();
@@ -510,7 +529,8 @@ void PCIGeneral::allocateYawAlongFistSegment(std::vector<geometry_msgs::Pose> &p
   }
 }
 
-void PCIGeneral::allocateYawAlongPath(std::vector<geometry_msgs::Pose> &path) const {
+void PCIGeneral::allocateYawAlongPath(
+    std::vector<geometry_msgs::Pose>& path) const {
   // Return if only one vertex or less.
   if (path.size() <= 1) return;
   ROS_WARN("V max: %f, yr max: %f", v_max_, yaw_rate_max_);
@@ -550,9 +570,8 @@ void PCIGeneral::allocateYawAlongPath(std::vector<geometry_msgs::Pose> &path) co
   }
 }
 
-
-void PCIGeneral::interpolatePath(const std::vector<geometry_msgs::Pose> &path,
-                       std::vector<geometry_msgs::Pose> &path_res) {
+void PCIGeneral::interpolatePath(const std::vector<geometry_msgs::Pose>& path,
+                                 std::vector<geometry_msgs::Pose>& path_res) {
   path_res.clear();
   if (path.size() == 0) return;
   if (path.size() == 1) path_res.push_back(path[0]);
@@ -601,41 +620,41 @@ void PCIGeneral::interpolatePath(const std::vector<geometry_msgs::Pose> &path,
 }
 
 void PCIGeneral::executionTimerCallback(const ros::TimerEvent& event) {
-  if(pci_status_ == PCIStatus::kRunning) {
+  if (pci_status_ == PCIStatus::kRunning) {
     double kGoalThres = 0.5;
     double remaining_dist = getEndPointDistanceAlongPath(executing_path_);
-    if(planner_trigger_lead_time_ > 0.0) {
-      if(remaining_dist / v_max_ <= planner_trigger_lead_time_) {
+    if (planner_trigger_lead_time_ > 0.0) {
+      if (remaining_dist / v_max_ <= planner_trigger_lead_time_) {
         triggerPlanner();
       }
-    }
-    else {
-      if(remaining_dist <= kGoalThres) {
+    } else {
+      if (remaining_dist <= kGoalThres) {
         triggerPlanner();
       }
     }
   }
 }
 
-void PCIGeneral::actionActiveCallback() {
-	ROS_INFO("PCI: Goal went active");
+void PCIGeneral::actionActiveCallback() { ROS_INFO("PCI: Goal went active"); }
+
+void PCIGeneral::actionFeedbackCallback(
+    const planner_msgs::pathFollowerActionFeedbackConstPtr& feedback) {
+  if (planner_trigger_lead_time_ > 0.0 &&
+      feedback->estimated_time_remaining < planner_trigger_lead_time_) {
+    triggerPlanner();
+  }
 }
 
-void PCIGeneral::actionFeedbackCallback(const planner_msgs::pathFollowerActionFeedbackConstPtr &feedback) {
-	if (planner_trigger_lead_time_ > 0.0 && feedback->estimated_time_remaining < planner_trigger_lead_time_) {
-		triggerPlanner();
-	}
-}
-
-bool PCIGeneral::actionDoneCallback(const actionlib::SimpleClientGoalState &state, 
-                          const planner_msgs::pathFollowerActionResultConstPtr &result){
-	ROS_INFO("Finished Goal.");
+bool PCIGeneral::actionDoneCallback(
+    const actionlib::SimpleClientGoalState& state,
+    const planner_msgs::pathFollowerActionResultConstPtr& result) {
+  ROS_INFO("Finished Goal.");
   if (state == actionlib::SimpleClientGoalState::SUCCEEDED) {
     triggerPlanner();
   } else {
     pci_status_ = PCIStatus::kError;
   }
-	return true;
+  return true;
 }
 
 void PCIGeneral::triggerPlanner() {
@@ -670,7 +689,8 @@ bool PCIGeneral::loadParams(const std::string ns) {
   param_name = ns + "/world_frame_id";
   if (!ros::param::get(param_name, world_frame_id_)) {
     world_frame_id_ = "world";
-    ROS_WARN("No world_frame_id setting, set it to: %s ", world_frame_id_.c_str());
+    ROS_WARN("No world_frame_id setting, set it to: %s ",
+             world_frame_id_.c_str());
   }
 
   param_name = ns + "/init_motion/z_takeoff";
@@ -727,7 +747,8 @@ bool PCIGeneral::loadParams(const std::string ns) {
   }
 
   param_name = ns + "/planner_trigger_lead_time";
-  if (!ros::param::get(param_name, planner_trigger_lead_time_) || (planner_trigger_lead_time_ <= 0.0)) {
+  if (!ros::param::get(param_name, planner_trigger_lead_time_) ||
+      (planner_trigger_lead_time_ <= 0.0)) {
     planner_trigger_lead_time_ = 0.0;
     ROS_WARN("No planner_trigger_lead_time setting, set it to 0.0 (s).");
   } else {
@@ -757,16 +778,14 @@ bool PCIGeneral::loadParams(const std::string ns) {
   if (!ros::param::get(param_name, robot_type_in)) {
     robot_type_ = RobotType::kAerial;
     ROS_WARN("No robot_type setting, set it to: kAerial.");
-  }
-  else {
-    if(robot_type_in == "kAerial") {
+  } else {
+    if (robot_type_in == "kAerial") {
       robot_type_ = RobotType::kAerial;
-    }
-    else if(robot_type_in == "kGround") {
+    } else if (robot_type_in == "kGround") {
       robot_type_ = RobotType::kGround;
-    }
-    else {
-      ROS_WARN("Unknown Robot Type %s, setting it to: kAerial.", robot_type_in.c_str());
+    } else {
+      ROS_WARN("Unknown Robot Type %s, setting it to: kAerial.",
+               robot_type_in.c_str());
       robot_type_ = RobotType::kAerial;
     }
   }
@@ -776,16 +795,14 @@ bool PCIGeneral::loadParams(const std::string ns) {
   if (!ros::param::get(param_name, output_type_in)) {
     output_type_ = OutputType::kTopic;
     ROS_WARN("No output_type setting, set it to: kAerial.");
-  }
-  else {
-    if(output_type_in == "kTopic") {
+  } else {
+    if (output_type_in == "kTopic") {
       output_type_ = OutputType::kTopic;
-    }
-    else if(output_type_in == "kAction") {
+    } else if (output_type_in == "kAction") {
       output_type_ = OutputType::kAction;
-    }
-    else {
-      ROS_WARN("Unknown Robot Type %s, setting it to: kAerial.", output_type_in.c_str());
+    } else {
+      ROS_WARN("Unknown Robot Type %s, setting it to: kAerial.",
+               output_type_in.c_str());
       output_type_ = OutputType::kTopic;
     }
   }
@@ -793,7 +810,7 @@ bool PCIGeneral::loadParams(const std::string ns) {
   return true;
 }
 
-void PCIGeneral::setState(const geometry_msgs::Pose &pose) {
+void PCIGeneral::setState(const geometry_msgs::Pose& pose) {
   current_pose_.position.x = pose.position.x;
   current_pose_.position.y = pose.position.y;
   current_pose_.position.z = pose.position.z;
@@ -804,33 +821,35 @@ void PCIGeneral::setState(const geometry_msgs::Pose &pose) {
 }
 
 void PCIGeneral::setVelocity(double v) {
-  if ((v >= kVelMin) && (v <= kVelMax )) {
+  if ((v >= kVelMin) && (v <= kVelMax)) {
     ROS_WARN("Changed velocity from %f to %f (m/s)", v_max_, v);
     v_max_ = v;
   }
 }
 
-double PCIGeneral::getEndPointDistanceAlongPath(const std::vector<geometry_msgs::Pose> &path) {
+double PCIGeneral::getEndPointDistanceAlongPath(
+    const std::vector<geometry_msgs::Pose>& path) {
   std::vector<double> dists;
-	for(int i=0;i<path.size();++i) {
-		dists.push_back(calculateDistance(current_pose_, path[i]));
-	}
-	int closest_waypoint_ind = std::min_element(dists.begin(),dists.end()) - dists.begin();
+  for (int i = 0; i < path.size(); ++i) {
+    dists.push_back(calculateDistance(current_pose_, path[i]));
+  }
+  int closest_waypoint_ind =
+      std::min_element(dists.begin(), dists.end()) - dists.begin();
 
   double total_dist = 0.0;
   total_dist += calculateDistance(current_pose_, path[closest_waypoint_ind]);
-  for(int i=closest_waypoint_ind+1;i<path.size();++i) {
-    total_dist += calculateDistance(path[i], path[i-1]);
+  for (int i = closest_waypoint_ind + 1; i < path.size(); ++i) {
+    total_dist += calculateDistance(path[i], path[i - 1]);
   }
   return total_dist;
 }
 
-double PCIGeneral::calculateDistance(const geometry_msgs::Pose &p1, const geometry_msgs::Pose &p2) {
-	Eigen::Vector3d v1(p1.position.x, p1.position.y, p1.position.z);
-	Eigen::Vector3d v2(p2.position.x, p2.position.y, p2.position.z);
+double PCIGeneral::calculateDistance(const geometry_msgs::Pose& p1,
+                                     const geometry_msgs::Pose& p2) {
+  Eigen::Vector3d v1(p1.position.x, p1.position.y, p1.position.z);
+  Eigen::Vector3d v2(p2.position.x, p2.position.y, p2.position.z);
 
-	return (v1 - v2).head(2).norm();
+  return (v1 - v2).head(2).norm();
 }
-
 
 }  // namespace explorer
