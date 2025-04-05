@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<launch>
+  <arg name="launch_prefix" default=""/>
+  <arg name="pci_file" default="$(find gbplanner_pci_m100)/config/planner_control_interface_config.yaml"/>
+	
+	<arg name="odometry_topic" default="/msf_core/odometry"/>
+  <node pkg="gbplanner_pci_m100" type="gbplanner_pci_m100_ros_node" name="gbplanner_pci_m100_ros_node" output="screen">
+    <remap from="planner_server" to="gbplanner" />
+    <remap from="planner_homing_server" to="gbplanner/homing" />
+    <remap from="odometry" to="$(arg odometry_topic)"/>
+    <rosparam command="load" file="$(arg pci_file)" />
+  </node>
+
+</launch>
