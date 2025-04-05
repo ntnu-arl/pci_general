@@ -48,7 +48,6 @@ class PCIGeneral : public PCIManager {
   inline void convert(const StateVec &st, geometry_msgs::Pose &p)
   {
     tf::Quaternion quat;
-    // quat.setEuler(0.0, 0.0, st[3]);
     Eigen::Matrix3d rot_eigen;
     rot_eigen = Eigen::AngleAxisd(0.0, Eigen::Vector3d::UnitY()) *
               Eigen::AngleAxisd(st[3], Eigen::Vector3d::UnitZ()) *
@@ -69,12 +68,6 @@ class PCIGeneral : public PCIManager {
     st[0] = p.position.x;
     st[1] = p.position.y;
     st[2] = p.position.z;
-    // st[3] = tf::getYaw(p.orientation);
-    // tf::Quaternion quat(p.orientation.x, p.orientation.y, p.orientation.z, p.orientation.w);
-    // tfScalar yaw, pitch, roll;
-    // tf::Matrix3x3 mat(quat);
-    // mat.getEulerYPR(yaw, pitch, roll);
-    // st[3] = yaw;
     Eigen::Quaterniond q;
     q.x() = p.orientation.x;
     q.y() = p.orientation.y;
