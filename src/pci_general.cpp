@@ -18,11 +18,8 @@ namespace explorer
     status_sub_ = nh_.subscribe("/matrice/status", 10, &PCIGeneral::statusCallback, this);
     robot_status_pub_ = nh_.advertise<planner_msgs::RobotStatus>("/robot_status", 10);
     carrot_pose_pub_ = nh_.advertise<geometry_msgs::PoseStamped>("pci_carrot", 10);
-    carrot_point_pub_ = nh_.advertise<geometry_msgs::PointStamped>("pci_carrot_point", 10);
-    act_cam_angle_pub_ = nh_.advertise<std_msgs::Float64>("act_cam_cmd", 10);
 
     trajectory_sub_ = nh_.subscribe("/pci_general/path_following", 10, &PCIGeneral::pathFollowingCallback, this);
-    cam_pitch_sub_ = nh_.subscribe("cam_pitch", 10, &PCIGeneral::camPitchCallback, this);
 
     execution_timer_ = nh_.createTimer(
         ros::Duration(0.05), &PCIGeneral::executionTimerCallback, this);
@@ -117,6 +114,10 @@ namespace explorer
       pose.position.x = current_pose_.position.x;
       pose.position.y = current_pose_.position.y;
       pose.position.z = current_pose_.position.z + init_z_takeoff_;
+      // pose.orientation.x = 0;
+      // pose.orientation.y = 0;
+      // pose.orientation.z = 0;
+      // pose.orientation.w = 1;
       pose.orientation.x = current_pose_.orientation.x;
       pose.orientation.y = current_pose_.orientation.y;
       pose.orientation.z = current_pose_.orientation.z;
@@ -128,6 +129,10 @@ namespace explorer
       pose.position.x = current_pose_.position.x;
       pose.position.y = current_pose_.position.y;
       pose.position.z = current_pose_.position.z + init_z_takeoff_ - init_z_drop_;
+      // pose.orientation.x = 0;
+      // pose.orientation.y = 0;
+      // pose.orientation.z = 0;
+      // pose.orientation.w = 1;
       pose.orientation.x = current_pose_.orientation.x;
       pose.orientation.y = current_pose_.orientation.y;
       pose.orientation.z = current_pose_.orientation.z;
@@ -139,6 +144,10 @@ namespace explorer
       pose.position.x = current_pose_.position.x + init_x_forward_;
       pose.position.y = current_pose_.position.y;
       pose.position.z = current_pose_.position.z + init_z_takeoff_ - init_z_drop_;
+      // pose.orientation.x = 0;
+      // pose.orientation.y = 0;
+      // pose.orientation.z = 0;
+      // pose.orientation.w = 1;
       pose.orientation.x = current_pose_.orientation.x;
       pose.orientation.y = current_pose_.orientation.y;
       pose.orientation.z = current_pose_.orientation.z;
@@ -148,6 +157,7 @@ namespace explorer
 
     std::vector<geometry_msgs::Pose> path_new;
     interpolatePath(init_path, path_new, v_init_max_, yaw_rate_max_);
+    // path_new = init_path;
 
     executing_path_ = path_new;
 
@@ -208,22 +218,21 @@ namespace explorer
 
     ROS_INFO(". . . waiting initMotion()");
     ros::Duration(5.0).sleep();
-
+    
     pci_status_ = PCIStatus::kReady;
     ROS_INFO("initMotion() - Done");
     return true;
   }
 
-  std::vector<std::string> PCIGeneral::split_string(std::string input_string)
-  {
-    std::string::iterator new_end = std::unique(input_string.begin(), input_string.end(), [](const char &x, const char &y)
-                                                { return x == y and x == ' '; });
+  std::vector<std::string> PCIGeneral::split_string(std::string input_string) {
+    std::string::iterator new_end = std::unique(input_string.begin(), input_string.end(), [] (const char &x, const char &y) {
+        return x == y and x == ' ';
+    });
 
     input_string.erase(new_end, input_string.end());
 
-    while (input_string[input_string.length() - 1] == ' ')
-    {
-      input_string.pop_back();
+    while (input_string[input_string.length() - 1] == ' ') {
+        input_string.pop_back();
     }
 
     std::vector<std::string> splits;
@@ -232,25 +241,24 @@ namespace explorer
     size_t i = 0;
     size_t pos = input_string.find(delimiter);
 
-    while (pos != std::string::npos)
-    {
-      splits.push_back(input_string.substr(i, pos - i));
-      i = pos + 1;
-      pos = input_string.find(delimiter, i);
+    while (pos != std::string::npos) {
+        splits.push_back(input_string.substr(i, pos - i));
+        i = pos + 1;
+        pos = input_string.find(delimiter, i);
     }
 
     splits.push_back(input_string.substr(i, std::min(pos, input_string.length()) - i + 1));
     return splits;
   }
 
-  void PCIGeneral::pathFollowingCallback(const std_msgs::String::ConstPtr &msg)
+  void PCIGeneral::pathFollowingCallback(const std_msgs::String::ConstPtr& msg)
   {
     // std::cout << "Path following cb" << std::endl;
     std::string filename = msg->data;
     std::ifstream infile(filename.c_str(), std::ifstream::in);
 
     ROS_WARN_COND(global_verbosity >= Verbosity::INFO, "Loading waypoints from the file: %s", filename.c_str());
-    std::ifstream ifs(filename.c_str(), std::ifstream::in);
+    std::ifstream ifs (filename.c_str(), std::ifstream::in);
 
     const int kNumberElements = 7; // x,y,z,qx,qy,qz,qw
     std::vector<std::vector<double>> waypoints;
@@ -258,48 +266,42 @@ namespace explorer
     std::string line;
     int count = 0;
     bool valid = true;
-    while (!infile.eof())
-    {
+    while(!infile.eof()) {
       std::getline(infile, line);
       ++count;
       std::vector<std::string> new_str;
-      if (!line.empty())
-        new_str = split_string(line);
-      else
-      {
+      if (!line.empty()) new_str = split_string(line);
+      else {
+        // ROS_WARN("Empty line");
         break;
       }
 
-      if (new_str.size() != kNumberElements)
-      {
+      if (new_str.size() != kNumberElements) {
         // something wrong
         ROS_ERROR("Line %d has %d fields (must be %d fields x-y-z-qx-qy-qz-qw)", count, (int)new_str.size(), kNumberElements);
         valid = false;
         break;
       }
       std::vector<double> wp;
-      for (int i = 0; i < kNumberElements; i++)
-      {
-        double val = stod(new_str[i]);
-        wp.push_back(val);
+      for (int i = 0; i < kNumberElements; i++) {
+          double val = stod(new_str[i]);
+          wp.push_back(val);
       }
       waypoints.push_back(wp);
       line = "";
     }
     infile.close();
 
-    if (!valid)
-      return;
+    if (!valid) return;
 
     ROS_WARN_COND(global_verbosity >= Verbosity::INFO, "Generating %d waypoints.", (int)waypoints.size());
     std::vector<geometry_msgs::Pose> path_new, mod_path;
-    for (auto &wp : waypoints)
-    {
+    for(auto &wp: waypoints) {
       geometry_msgs::Pose pose;
       pose.position.x = current_pose_.position.x + wp[0];
       pose.position.y = current_pose_.position.y + wp[1];
       pose.position.z = current_pose_.position.z + wp[2];
-      double q_norm = std::sqrt(wp[3] * wp[3] + wp[4] * wp[4] + wp[5] * wp[5] + wp[6] * wp[6]);
+      double q_norm = std::sqrt(wp[3]*wp[3] + wp[4]*wp[4] + wp[5]*wp[5] + wp[6]*wp[6]);
       pose.orientation.x = wp[3] / q_norm;
       pose.orientation.y = wp[4] / q_norm;
       pose.orientation.z = wp[5] / q_norm;
@@ -308,7 +310,12 @@ namespace explorer
                 << " Q: " << pose.orientation.x << " " << pose.orientation.y << " " << pose.orientation.z << " " << pose.orientation.w << " \n";
       path_new.push_back(pose);
     }
+    
+    // std_msgs::Bool is_homing_msg; 
+    // is_homing_msg.data = true;
+    // is_homing_pub_.publish(is_homing_msg);
 
+    // executePath(path_new, mod_path, ExecutionPathType::kManualPath);
     executePath(path_new, mod_path, ExecutionPathType::kLocalPath);
 
     ROS_INFO("Finished the trajectory.");
@@ -420,15 +427,13 @@ namespace explorer
       std::vector<geometry_msgs::Pose> &modified_path,
       ExecutionPathType path_type)
   {
-    if(mission_start_time_ < 0)
-    {
-      mission_start_time_ = ros::Time::now().toSec();
-    }
     if (path.size() <= 1)
       return false; // require at least 2 nodes
 
     ros::Duration(0.01).sleep(); // sleep to unblock the thread to get latest odometry.
     ros::spinOnce();
+
+    // std::cout << "Path type: " << (int)path_type << std::endl;
 
     // Setting velocity
     double v_max = v_max_;
@@ -465,28 +470,25 @@ namespace explorer
 
     current_path_type_ = path_type;
 
-    std::vector<geometry_msgs::Pose> path_new = path;
+    std::vector<geometry_msgs::Pose> path_new;
+    std::vector<geometry_msgs::Pose> path_copy = path;
+    path_new = path;
     if (path_type != ExecutionPathType::kManualPath)
     {
-      ROS_WARN("Path type not kManual");
       // Only modify for path derived from auto mode.
       // Extend the path to current position if necessary to achieve better transition.
-      if (reconnect_path_)
+      // if(wp_curr_ == 0)
+      // {
+      // }
+      if (reconnectPath(path_copy, path_new))
       {
-        if (reconnectPath(path, path_new))
-        {
-          ROS_INFO_COND(global_verbosity >= Verbosity::DEBUG, "Reconnect done");
-        }
-        else
-        {
-          ROS_WARN_COND(global_verbosity >= Verbosity::WARN, "Unsafe to execute this path since it is too far from the current position");
-          modified_path.push_back(current_pose_);
-          return false;
-        }
+        ROS_INFO_COND(global_verbosity >= Verbosity::DEBUG, "Reconnect done");
       }
       else
       {
-        path_new = path;
+        ROS_WARN_COND(global_verbosity >= Verbosity::WARN, "Unsafe to execute this path since it is too far from the current position");
+        modified_path.push_back(current_pose_);
+        return false;
       }
 
       if (smooth_heading_enable_)
@@ -496,41 +498,31 @@ namespace explorer
         }
       }
     }
-
-    if (path_type != ExecutionPathType::kManualPath)
-    {
-      linearlyInterpolateYaw(path_new);
-    }
+    // else
+    // {
+    //   path_new.insert(path_new.begin(), current_pose_);
+    // }
     
 
     // Return final path.
     modified_path = path_new;
     // Store this path for the next iteration.
-    
+    // executing_path_ = path_new;
+
     // Execute the path.
     // No need to interpolate the path in case of MPC.
     n_seq_++;
     std::vector<geometry_msgs::Pose> path_intp;
-    
-    if(interpolate_traj_)
-      interpolatePath(path_new, path_intp);
-    else
-      path_intp = path_new;
-    
-    double time_passed = ros::Time::now().toSec() - mission_start_time_;
-    ROS_WARN("Mission start time: %f, t now: %f", mission_start_time_, ros::Time::now().toSec());
-    if(time_passed >= z_off_t_start_)
-    {
-      double t_ratio = (time_passed - z_off_t_start_) / (max_mission_time_ - z_off_t_start_);
-      if(t_ratio > 1.0) t_ratio = 1.0;
-      double z_offset = z_offset_a_ + z_offset_b_ * t_ratio;
-      ROS_WARN("[PCI]: z offset: %f", z_offset);
-      for (int i = 1; i < path_intp.size(); i++)
-      {
-        path_intp[i].position.z += z_offset;
-      }
-    }
-
+    // path_intp = path_new
+    // ROS_WARN("PCI: Path to be interpolated:");
+    // for (int i = 0; i < path_new.size(); i++)
+    // {
+    //   std::cout << path_new[i].position.x << " " << path_new[i].position.y << " " << path_new[i].position.z << ", " << tf::getYaw(path_new[i].orientation) << std::endl;
+    // }
+    interpolatePath(path_new, path_intp);
+    // path_intp = path_new;
+    if(path_intp.size() > 1)
+      path_intp.erase(path_intp.begin());
     executing_path_ = path_intp;
     
     samples_array_.header.seq = n_seq_;
@@ -541,10 +533,11 @@ namespace explorer
     output_path_.poses.clear();
     output_path_.poses.reserve(path_intp.size());
 
-    double sum_time_from_start = 0;
+    // double sum_time_from_start = trajectory_lead_time_;
+    double sum_time_from_start = absolute_time_from_start_ + trajectory_lead_time_;
     Eigen::Vector3d prev_vel = current_vel_;
     double current_speed = 0.0;
-    
+    // double sum_time_from_start = 10.0;
     for (int i = 0; i < path_intp.size(); i++)
     {
       double yaw = tf::getYaw(path_intp[i].orientation);
@@ -557,55 +550,6 @@ namespace explorer
       trajectory_point_.setFromYaw(yaw);
       mav_msgs::msgMultiDofJointTrajectoryPointFromEigen(
           trajectory_point_, &trajectory_point_msg_);
-      if(set_first_wp_speed_)
-      {
-        if(i < path_intp.size()-1)
-        {
-          trajectory_point_msg_.velocities.clear();
-          Eigen::Vector3d p_0, p_1;
-          Eigen::Vector3d vel;
-          if(i > 0)
-          {
-            p_0 << path_intp[i-1].position.x, path_intp[i-1].position.y, path_intp[i-1].position.z;
-            p_1 << path_intp[i].position.x, path_intp[i].position.y, path_intp[i].position.z;
-          }
-          else
-          {
-            p_0 << current_pose_.position.x, current_pose_.position.y, current_pose_.position.z;
-            p_1 << path_intp[i].position.x, path_intp[i].position.y, path_intp[i].position.z;
-          }
-          Eigen::Vector3d p_2(path_intp[i+1].position.x, path_intp[i+1].position.y, path_intp[i+1].position.z);
-          Eigen::Vector3d d1 = p_0 - p_1;
-          Eigen::Vector3d d2 = p_2 - p_1;
-          if(d1.norm() <= 0.001 || d2.norm() <= 0.001)
-          {
-            vel << 0.0, 0.0, 0.0;
-          }
-          else
-          {
-            double d = d2.normalized().dot(d1.normalized());
-            if(d > 1.0) d = 1.0;
-            else if(d < -1.0) d = -1.0;
-            double theta = std::acos(d);
-            truncateAngle(theta);
-            double aloc_speed = std::max(0.0, (v_max - 0.0) * (2 * theta / M_PI - 1) + 0.0);
-            if(i < path_intp.size()-2)
-            {
-              Eigen::Vector3d p_3(path_intp[i+2].position.x, path_intp[i+2].position.y, path_intp[i+2].position.z);
-              vel = aloc_speed * (p_3 - p_1).normalized();
-            }
-            else
-            {
-              vel = aloc_speed * (p_2 - p_0).normalized();
-            }
-          }
-          geometry_msgs::Twist twist;
-          twist.linear.x = vel.x();
-          twist.linear.y = vel.y();
-          twist.linear.z = vel.z();
-          trajectory_point_msg_.velocities.push_back(twist);
-        }
-      }
       if (i > 0)
       {
         Eigen::Vector3d p0(path_intp[i - 1].position.x,
@@ -624,49 +568,62 @@ namespace explorer
         double trans_time, end_speed;
         double current_proj_speed = current_speed;
         end_speed = current_proj_speed;
-        if(false)
+        // std::cout << "Prev speed: " << prev_vel.norm() << " | " << std::endl;
+        if(seg_len <= 0.0) 
         {
-          trans_time = seg_len / v_max_;
+          trans_time = 0.0;
+          // current_proj_speed = prev_vel.norm();
+          // std::cout << "Seg len = 0" << std::endl;
         }
         else
         {
-          if(seg_len <= 0.0) 
+          end_speed = std::sqrt(current_proj_speed*current_proj_speed + 2 * a_max_ * seg_len);
+          if(end_speed > v_max_) 
           {
-            trans_time = 0.0;
+            end_speed = v_max_;
+            double ta = (end_speed - current_proj_speed) / a_max_;
+            double da = current_proj_speed * ta + 0.5 * a_max_ * ta * ta;
+            double tc = (seg_len - da) / end_speed;
+            trans_time = ta + tc;
           }
           else
           {
-            end_speed = std::sqrt(current_proj_speed*current_proj_speed + 2 * a_max_ * seg_len);
-            if(end_speed > v_max_) 
-            {
-              end_speed = v_max_;
-              double ta = (end_speed - current_proj_speed) / a_max_;
-              double da = current_proj_speed * ta + 0.5 * a_max_ * ta * ta;
-              double tc = (seg_len - da) / end_speed;
-              trans_time = ta + tc;
-            }
-            else
-            {
-              trans_time = (end_speed - current_proj_speed) / a_max_;
-            }
+            trans_time = (end_speed - current_proj_speed) / a_max_;
           }
         }
         
         double rot_time = std::abs(dyaw) / yaw_rate_max_;
+        // trans_time = seg_len / v_max_;
         double delta_time = std::max(trans_time, rot_time);
         sum_time_from_start +=
             std::max(trans_time, rot_time) + kEpsilon; // to avoid the Nan issue for MPC.
         if(seg_len > 0.0)
         {
           current_speed = end_speed;
+        
+          // if(rot_time > trans_time)
+          // {
+          //   double a_new = 2 * (seg_len - current_proj_speed * rot_time) / (rot_time * rot_time);
+          //   end_speed = std::sqrt(current_proj_speed * current_proj_speed + 2 * a_new * seg_len);
+          //   std::cout << "a new: " << a_new << std::endl;
+          // }
+          // if(end_speed > v_max_) 
+          // {
+          //   end_speed = v_max_;
+          // }
           prev_vel = seg.normalized() * end_speed;
         }
         else
         {
           current_speed = 0.0;
         }
+        // ROS_WARN("Time from start: %f | delta t: %f | current speed: %f | end speed: %f | seg_len: %f", sum_time_from_start, delta_time, current_proj_speed, end_speed, seg_len);
       }
-
+      else
+      {
+        // ROS_WARN("Time from start: %f", sum_time_from_start);
+      }
+      
       trajectory_point_msg_.time_from_start =
           ros::Duration(sum_time_from_start);
       samples_array_.points.push_back(trajectory_point_msg_);
@@ -684,166 +641,117 @@ namespace explorer
     std_msgs::Bool is_homing_msg; 
     is_homing_msg.data = is_homing_;
     is_homing_pub_.publish(is_homing_msg);
+
     pci_status_ = PCIStatus::kRunning;
 
     path_waypoint_ind_ = 0;
+    // ROS_WARN("PCI: Ready to trigger the planner.");
     return true;
   }
 
-
-  void PCIGeneral::executionTimerCallback(const ros::TimerEvent &event)
+void PCIGeneral::executionTimerCallback(const ros::TimerEvent& event) {
+  if (force_stop_)
   {
-    if (force_stop_)
-    {
-      force_stop_ = false;
-      pci_status_ = PCIStatus::kError;
-      path_waypoint_ind_ = 0;
-    }
-    if (pci_status_ == PCIStatus::kRunning)
-    {
-      double dist_thr;
-      double yaw_thr = path_progression_yaw_thr_;
-      double pitch_thr = path_progression_yaw_thr_;
-
-      Eigen::Quaterniond q;
-      q.x() = executing_path_[path_waypoint_ind_].orientation.x;
-      q.y() = executing_path_[path_waypoint_ind_].orientation.y;
-      q.z() = executing_path_[path_waypoint_ind_].orientation.z;
-      q.w() = executing_path_[path_waypoint_ind_].orientation.w;
-      Eigen::Vector3d euler_custom = quaternionToEuler(q);
-      double wp_yaw = euler_custom.z();
-      double wp_pitch = euler_custom.y();
-
+    force_stop_ = false;
+    pci_status_ = PCIStatus::kError;
+    path_waypoint_ind_ = 0;
+  }
+  if (pci_status_ == PCIStatus::kRunning) {
+    if(path_waypoint_ind_ < executing_path_.size()-1) {
+      double wp_dist = calculateDistance(current_pose_, executing_path_[path_waypoint_ind_]);
       double current_yaw = tf::getYaw(current_pose_.orientation);
       truncateYaw(current_yaw);
-
-      Eigen::Vector3d current_pos(current_pose_.position.x, current_pose_.position.y, current_pose_.position.z);
-      Eigen::Vector3d p_1(executing_path_[path_waypoint_ind_].position.x, executing_path_[path_waypoint_ind_].position.y, executing_path_[path_waypoint_ind_].position.z);
-
-      if (path_waypoint_ind_ < executing_path_.size() - 1)
-      {
-        Eigen::Vector3d p_2(executing_path_[path_waypoint_ind_ + 1].position.x, executing_path_[path_waypoint_ind_ + 1].position.y, executing_path_[path_waypoint_ind_ + 1].position.z);
-        Eigen::Vector3d d1 = current_pos - p_1;
-        Eigen::Vector3d d2 = p_2 - p_1;
-        if(d1.norm() <= 0.001 || d2.norm() <= 0.001)
-        {
-          dist_thr = path_end_dist_thr_;
-        }
-        else
-        {
-          double theta = std::acos((p_2 - p_1).normalized().dot((current_pos - p_1).normalized()));
-          truncateAngle(theta);
-          dist_thr = std::max(path_progression_dist_thr_min_, (path_progression_dist_thr_ - path_progression_dist_thr_min_) * (2 * theta / M_PI - 1) + path_progression_dist_thr_min_);
-        }
-        Eigen::Quaterniond q_next;
-        q_next.x() = executing_path_[path_waypoint_ind_+1].orientation.x;
-        q_next.y() = executing_path_[path_waypoint_ind_+1].orientation.y;
-        q_next.z() = executing_path_[path_waypoint_ind_+1].orientation.z;
-        q_next.w() = executing_path_[path_waypoint_ind_+1].orientation.w;
-        Eigen::Vector3d euler_custom_next = quaternionToEuler(q_next);
-        double next_wp_yaw = euler_custom_next.z();
-        double syd1 = signedAngularDistance(wp_yaw, current_yaw);
-        double syd2 = signedAngularDistance(next_wp_yaw, wp_yaw);
-        if(std::signbit(syd2) != std::signbit(syd1))
-        {
-          yaw_thr = path_progression_yaw_thr_min_;
-        }
-      }
-      else
-      {
-        dist_thr = path_end_dist_thr_;
-      }
-
-      double wp_dist = calculateDistance(current_pose_, executing_path_[path_waypoint_ind_]);
-      
+      double wp_yaw = tf::getYaw(executing_path_[path_waypoint_ind_].orientation);
       double delta_yaw = std::abs(wp_yaw - current_yaw);
       truncateYaw(delta_yaw);
 
-      double delta_pitch = std::abs(wp_pitch - current_cam_pitch_);
-      truncateYaw(delta_pitch);
-      if (wp_dist <= dist_thr && delta_yaw <= yaw_thr && delta_pitch <= path_progression_pitch_thr_)
-      {
+      if(wp_dist <= path_progression_dist_thr_ && delta_yaw <= path_progression_yaw_thr_) {
         ++path_waypoint_ind_;
-        if (path_waypoint_ind_ >= executing_path_.size())
-        {
-          pci_status_ = PCIStatus::kReady;
-          ROS_WARN_COND(global_verbosity >= Verbosity::PLANNER_STATUS, "PCI: Ready to trigger the planner.");
-        }
       }
+    }
+    else {
+      double remaining_dist = calculateDistance(current_pose_, executing_path_.back());
+      double current_yaw = tf::getYaw(current_pose_.orientation);
+      truncateYaw(current_yaw);
+      double end_yaw = tf::getYaw(executing_path_.back().orientation);
+      double delta_yaw = std::abs(end_yaw - current_yaw);
 
-      if (pci_status_ == PCIStatus::kRunning)
+      double mod_path_end_dist_thr = path_end_dist_thr_;
+      if(current_path_type_ == ExecutionPathType::kManualPath)
       {
-        geometry_msgs::PoseStamped ps;
-        ps.pose = executing_path_[path_waypoint_ind_];
-        StateVec s;
-        convert(ps.pose, s);
-        s(4) = 0;
-        convert(s, ps.pose);
-        ps.header.frame_id = "world";
-        carrot_pose_pub_.publish(ps);
-        geometry_msgs::PointStamped pts;
-        pts.point = ps.pose.position;
-        pts.header.frame_id = "map";
-        carrot_point_pub_.publish(pts);
-        // Publish ps as a path
-        nav_msgs::Path path;
-        path.header.frame_id = "world";
-        path.header.stamp = ros::Time::now();
-        path.poses.push_back(ps);
-        if(pub_singple_wp_)
-          path_pub_.publish(path);
-        double pitch_cmd = euler_custom.y();
-        std_msgs::Float64 pitch_msg;
-        pitch_msg.data = pitch_cmd;
-        act_cam_angle_pub_.publish(pitch_msg);
+        mod_path_end_dist_thr *= path_end_dist_scale_;
+      }
+      // std::cout << "remainging distance: " << remaining_dist << std::endl;
+      if(remaining_dist <= mod_path_end_dist_thr && delta_yaw <= path_end_yaw_thr_) {
+        pci_status_ = PCIStatus::kReady;
+        ROS_WARN_COND(global_verbosity >= Verbosity::PLANNER_STATUS, "PCI: Ready to trigger the planner.");
       }
     }
-  }
-
-  void PCIGeneral::camPitchCallback(const sensor_msgs::JointState &state)
-  {
-    current_cam_pitch_ = state.position[0];
-  }
-
-  double PCIGeneral::getEndPointDistanceAlongPath(
-      const std::vector<geometry_msgs::Pose> &path)
-  {
-    std::vector<double> dists;
-    for (int i = path_waypoint_ind_; i < path.size(); ++i)
-    {
-      dists.push_back(calculateDistance(current_pose_, path[i]));
+    if(path_waypoint_ind_ >=0 && path_waypoint_ind_ < executing_path_.size()) {
+      geometry_msgs::PoseStamped ps;
+      ps.pose = executing_path_[path_waypoint_ind_];
+      ps.header.frame_id = "world";
+      carrot_pose_pub_.publish(ps);
     }
-    int closest_waypoint_ind =
-        std::min_element(dists.begin(), dists.end()) - dists.begin();
-
-    path_waypoint_ind_ = closest_waypoint_ind;
-
-    double total_dist = 0.0;
-    total_dist += calculateDistance(current_pose_, path[closest_waypoint_ind]);
-    for (int i = closest_waypoint_ind + 1; i < path.size(); ++i)
-    {
-      total_dist += calculateDistance(path[i], path[i - 1]);
-    }
-    return total_dist;
   }
+  // if (pci_status_ == PCIStatus::kRunning) {
+  //   // double remaining_dist = getEndPointDistanceAlongPath(executing_path_);
+  //   double remaining_dist = calculateDistance(current_pose_, executing_path_.back());
+  //   double current_yaw = tf::getYaw(current_pose_.orientation);
+  //   truncateYaw(current_yaw);
+  //   double end_yaw = tf::getYaw(executing_path_.back().orientation);
+  //   double delta_yaw = std::abs(end_yaw - current_yaw);
+  //   // ROS_WARN("Path wp ind: %d || Dist error: %f | yaw error: %f", path_waypoint_ind_, remaining_dist, delta_yaw);
+  //   // if (planner_trigger_lead_time_ > 0.0) {
+  //   //   if (remaining_dist / v_max_ <= planner_trigger_lead_time_) {
+  //   //     pci_status_ = PCIStatus::kReady;
+  //   //   }
+  //   // } else {
+  //   //   if (remaining_dist <= kGoalThres) {
+  //   //     pci_status_ = PCIStatus::kReady;
+  //   //   }
+  //   // }
+  //   if(remaining_dist <= path_end_dist_thr_ && delta_yaw <= path_end_yaw_thr_) {
+  //     pci_status_ = PCIStatus::kReady;
+  //     ROS_WARN("PCI: Ready to trigger the planner.");
+  //   }
+  // }
+}
 
-  double PCIGeneral::calculateDistance(const geometry_msgs::Pose &p1,
-                                        const geometry_msgs::Pose &p2)
-  {
-    Eigen::Vector3d v1(p1.position.x, p1.position.y, p1.position.z);
-    Eigen::Vector3d v2(p2.position.x, p2.position.y, p2.position.z);
-
-    return (v1 - v2).head(3).norm();
+double PCIGeneral::getEndPointDistanceAlongPath(
+    const std::vector<geometry_msgs::Pose>& path) {
+  std::vector<double> dists;
+  for (int i = path_waypoint_ind_; i < path.size(); ++i) {
+    dists.push_back(calculateDistance(current_pose_, path[i]));
   }
+  int closest_waypoint_ind =
+      std::min_element(dists.begin(), dists.end()) - dists.begin();
+  
+  path_waypoint_ind_ = closest_waypoint_ind;
 
-  double PCIGeneral::calculateAbsDeltaAngle(double angle1, double angle2)
-  {
-    truncateYaw(angle1);
-    truncateYaw(angle2);
-    double delta = std::abs(angle1 - angle2);
-    truncateYaw(delta);
-    return delta;
+  double total_dist = 0.0;
+  total_dist += calculateDistance(current_pose_, path[closest_waypoint_ind]);
+  for (int i = closest_waypoint_ind + 1; i < path.size(); ++i) {
+    total_dist += calculateDistance(path[i], path[i - 1]);
   }
+  return total_dist;
+}
+
+double PCIGeneral::calculateDistance(const geometry_msgs::Pose& p1,
+                                     const geometry_msgs::Pose& p2) {
+  Eigen::Vector3d v1(p1.position.x, p1.position.y, p1.position.z);
+  Eigen::Vector3d v2(p2.position.x, p2.position.y, p2.position.z);
+
+  return (v1 - v2).head(3).norm();
+}
+
+double PCIGeneral::calculateAbsDeltaAngle(double angle1, double angle2) {
+  truncateYaw(angle1);
+  truncateYaw(angle2);
+  double delta = std::abs(angle1 - angle2);
+  truncateYaw(delta);
+  return delta;
+}
 
   void PCIGeneral::interpolatePath(const std::vector<geometry_msgs::Pose> &path,
                                     std::vector<geometry_msgs::Pose> &path_res)
@@ -875,7 +783,30 @@ namespace explorer
       double dist_norm = distance.norm();
       double disc = std::min(dt_ * v_max_ / dist_norm, dt_ * yaw_rate_max_ / abs(yaw_direction));
 
+      // const double kEpsilon = 0.0001;
+
       bool int_flag = true;
+      // if (dist_norm < kEpsilon) {
+      //   if (yaw_direction < kEpsilon) {
+      //     // Zero change
+      //     tf::Vector3 origin(start[0], start[1], start[2]);
+      //     tf::Quaternion quat;
+      //     quat.setEuler(0.0, 0.0, yaw_start);
+      //     tf::Pose poseTF(quat, origin);
+      //     geometry_msgs::Pose pose;
+      //     tf::poseTFToMsg(poseTF, pose);
+      //     path_res.push_back(pose);
+      //     int_flag = false;
+      //   } else {
+      //     disc = dt_ * yaw_rate_max_ / abs(yaw_direction);
+      //   }
+      // } else {
+      //   if (yaw_direction < kEpsilon) {
+      //     disc = dt_ * v_max_ / dist_norm;
+      //   } else {
+      //     disc = std::min(dt_ * v_max_ / dist_norm, dt_ * yaw_rate_max_ / abs(yaw_direction));
+      //   }
+      // }
 
       if (int_flag)
       {
@@ -958,7 +889,7 @@ namespace explorer
           path[i].position.y - path[i - 1].position.y,
           path[i].position.z - path[i - 1].position.z;
       if (dir_vec.norm() > 0.5)
-      { // TODO: Make parameter for this value (control how big a micro-segment is)
+      { //TODO: Make parameter for this value (control how big a micro-segment is)
         double yaw_first = std::atan2(path[i].position.y - path[0].position.y,
                                       path[i].position.x - path[0].position.x);
         tf::Quaternion quat;
@@ -1000,17 +931,21 @@ namespace explorer
       else if (dyaw > M_PI)
         dyaw -= 2 * M_PI;
 
+      // double trans_time = dir_vec.norm() / v_max_;
       double trans_time, end_speed;
       double current_proj_speed = current_speed;
       end_speed = current_proj_speed;
-      if (dir_vec.norm() <= 0.0)
+      // std::cout << "Prev speed: " << prev_vel.norm() << " | " << std::endl;
+      if(dir_vec.norm() <= 0.0) 
       {
         trans_time = 0.0;
+        // current_proj_speed = prev_vel.norm();
+        // std::cout << "Seg len = 0" << std::endl;
       }
       else
       {
-        end_speed = std::sqrt(current_proj_speed * current_proj_speed + 2 * a_max_ * dir_vec.norm());
-        if (end_speed > v_max_)
+        end_speed = std::sqrt(current_proj_speed*current_proj_speed + 2 * a_max_ * dir_vec.norm());
+        if(end_speed > v_max_) 
         {
           end_speed = v_max_;
           double ta = (end_speed - current_proj_speed) / a_max_;
@@ -1023,20 +958,40 @@ namespace explorer
           trans_time = (end_speed - current_proj_speed) / a_max_;
         }
       }
-
+      
       double rot_time = std::abs(dyaw) / yaw_rate_max_;
-
-      if (dir_vec.norm() > 0.0)
+      // // trans_time = dir_vec / v_max_;
+      // double delta_time = std::max(trans_time, rot_time);
+      // sum_time_from_start +=
+      //     std::max(trans_time, rot_time) + kEpsilon; // to avoid the Nan issue for MPC.
+      if(dir_vec.norm() > 0.0)
       {
         current_speed = end_speed;
-
+      
+        // if(rot_time > trans_time)
+        // {
+        //   double a_new = 2 * (dir_vec - current_proj_speed * rot_time) / (rot_time * rot_time);
+        //   end_speed = std::sqrt(current_proj_speed * current_proj_speed + 2 * a_new * dir_vec);
+        //   std::cout << "a new: " << a_new << std::endl;
+        // }
+        // if(end_speed > v_max_) 
+        // {
+        //   end_speed = v_max_;
+        // }
         prev_vel = dir_vec.normalized() * end_speed;
       }
       else
       {
         current_speed = 0.0;
       }
-
+      // double current_proj_speed = prev_vel.dot(dir_vec) / dir_vec.norm();
+      // double end_speed = std::sqrt(current_proj_speed*current_proj_speed + 2 * a_max_ * dir_vec.norm());
+      // if(end_speed > v_max_)
+      // {
+      //   end_speed = v_max_;
+      // }
+      // double trans_time = (end_speed - current_proj_speed) / a_max_;
+      // double rot_time = std::abs(dyaw / yaw_rate_max_);
       if (trans_time < rot_time)
       {
         // Re-assign another heading.
@@ -1047,23 +1002,11 @@ namespace explorer
         else if (yaw_now > M_PI)
           yaw_now -= 2 * M_PI;
         tf::Quaternion quat;
-        Eigen::Quaterniond q;
-        q.x() = path[i].orientation.x;
-        q.y() = path[i].orientation.y;
-        q.z() = path[i].orientation.z;
-        q.w() = path[i].orientation.w;
-        Eigen::Vector3d euler_custom = quaternionToEuler(q);
-        double pitch_now = euler_custom.y();
-        Eigen::Matrix3d rot_eigen;
-        rot_eigen = Eigen::AngleAxisd(0.0, Eigen::Vector3d::UnitY()) *
-                    Eigen::AngleAxisd(yaw_now, Eigen::Vector3d::UnitZ()) *
-                    Eigen::AngleAxisd(0, Eigen::Vector3d::UnitX());
-        rot_eigen = rot_eigen * Eigen::AngleAxisd(pitch_now, Eigen::Vector3d::UnitY());
-        Eigen::Quaterniond q_eigen(rot_eigen);
-        path[i].orientation.x = q_eigen.x();
-        path[i].orientation.y = q_eigen.y();
-        path[i].orientation.z = q_eigen.z();
-        path[i].orientation.w = q_eigen.w();
+        quat.setEuler(0.0, 0.0, yaw_now);
+        path[i].orientation.x = quat.x();
+        path[i].orientation.y = quat.y();
+        path[i].orientation.z = quat.z();
+        path[i].orientation.w = quat.w();
       }
       yaw_prev = yaw_now;
       prev_vel = dir_vec.normalized() * end_speed;
@@ -1077,27 +1020,41 @@ namespace explorer
 
     // Extend the path to current position if necessary to achieve better transition.
     // Check if the path starts from current pose.
-    const double kLimLow = 0.75; // all magic numbers
-    const double kLimHigh = 1.5;
+    const double kLimLow = 0.1; // all magic numbers
+    const double kLimHigh = 1.0;
     Eigen::Vector3d root_pos(path[0].position.x, path[0].position.y, path[0].position.z);
     Eigen::Vector3d second_pos(path[1].position.x, path[1].position.y, path[1].position.z);
     Eigen::Vector3d cur_pos(current_pose_.position.x, current_pose_.position.y, current_pose_.position.z);
     Eigen::Vector3d ext_seg;
     ext_seg = root_pos - cur_pos;
     double d_ext_seg = ext_seg.norm();
-    if (d_ext_seg <= kLimLow)
+    // if (d_ext_seg <= kLimLow)
+    // {
+    //   // no change needed.
+    //   return true;
+    // }
+    // else if (d_ext_seg <= kLimHigh)
+    if (d_ext_seg <= kLimHigh)
     {
-      ROS_WARN("Reconnect path: current pose is close to the path.");
-      // no change needed.
-      return true;
-    }
-    else if (d_ext_seg <= kLimHigh)
-    {
+      // Connect current pose to the path: assume that in the short distance it is safe to do so.
+      // Check if the current pose and the second node in the path are in the same side of the hyperplane.
+      // Compute the hyperplane
+      // ext_seg = ext_seg / d_ext_seg;
+      // double b = ext_seg.dot(root_pos);
+      // if ((ext_seg.dot(cur_pos) - b) * (ext_seg.dot(second_pos) - b) <= 0)
+      // {
+      //   // different side: add current pose to the root node
+      // }
+      // else
+      // {
+      //   // same side: ignore the root node, add current pose to the second one.
+      //   path_new.erase(path_new.begin());
+      // }
+      // path_new.insert(path_new.begin(), current_pose_);
       return true;
     }
     else if (planAhead() && concatenate_path_enable_ && (executing_path_.size() >= 1))
     {
-      ROS_WARN("Reconnect path: concatenating previous path to new path.");
       // Set path is too far away from current position,
       // but if we want and assume that planner is in auto mode.
       // Extend previous path to this path for safety purpose.
@@ -1112,7 +1069,7 @@ namespace explorer
         int exe_path_size = executing_path_.size();
         for (int ind = exe_path_size - 1; ind > 0; --ind)
         {
-          if (diffPos(executing_path_[ind - 1], current_pose_) < kLimHigh)
+          if (diffPos(executing_path_[ind - 1], current_pose_) < kLimLow)
           {
             path_new.insert(path_new.begin(), current_pose_);
             reconnect_ok = true;
@@ -1312,20 +1269,7 @@ namespace explorer
       path_progression_yaw_thr_ = 0.5;
       ROS_WARN_COND(param_verbosity >= Verbosity::WARN, "No path_progression_yaw_thr setting, setting it to %f (rad).", path_progression_yaw_thr_);
     }
-
-    param_name = ns + "/path_progression_yaw_thr_min";
-    if (!ros::param::get(param_name, path_progression_yaw_thr_min_))
-    {
-      path_progression_yaw_thr_min_ = path_progression_yaw_thr_;
-      ROS_WARN_COND(param_verbosity >= Verbosity::WARN, "No path_progression_yaw_thr_min setting, setting it to %f (rad).", path_progression_yaw_thr_min_);
-    }
-
-    param_name = ns + "/path_progression_pitch_thr";
-    if (!ros::param::get(param_name, path_progression_pitch_thr_))
-    {
-      path_progression_pitch_thr_ = 0.1;
-      ROS_WARN_COND(param_verbosity >= Verbosity::WARN, "No path_progression_pitch_thr setting, setting it to %f (rad).", path_progression_pitch_thr_);
-    }
+    
 
     param_name = ns + "/trajectory_lead_time";
     if (!ros::param::get(param_name, trajectory_lead_time_))
@@ -1339,76 +1283,6 @@ namespace explorer
     {
       smooth_homing_enable_ = smooth_heading_enable_;
       ROS_WARN_COND(param_verbosity >= Verbosity::WARN, "No smooth_homing_enable setting, setting it to %f (rad).", smooth_homing_enable_);
-    }
-
-    param_name = ns + "/z_offset_a";
-    if (!ros::param::get(param_name, z_offset_a_))
-    {
-      z_offset_a_ = 0.0;
-      ROS_WARN_COND(param_verbosity >= Verbosity::WARN, "No z_offset_a setting, setting it to %f (rad).", z_offset_a_);
-    }
-
-    param_name = ns + "/z_offset_b";
-    if (!ros::param::get(param_name, z_offset_b_))
-    {
-      z_offset_b_ = 0.0;
-      ROS_WARN_COND(param_verbosity >= Verbosity::WARN, "No z_offset_b setting, setting it to %f (rad).", z_offset_b_);
-    }
-
-    param_name = ns + "/max_mission_time";
-    if (!ros::param::get(param_name, max_mission_time_))
-    {
-      max_mission_time_ = 360.0;
-      ROS_WARN_COND(param_verbosity >= Verbosity::WARN, "No max_mission_time setting, setting it to %f (rad).", max_mission_time_);
-    }
-
-    param_name = ns + "/z_off_t_start";
-    if (!ros::param::get(param_name, z_off_t_start_))
-    {
-      z_off_t_start_ = 0.0;
-      ROS_WARN_COND(param_verbosity >= Verbosity::WARN, "No z_off_t_start setting, setting it to %f (rad).", z_off_t_start_);
-    }
-
-    param_name = ns + "/interpolate_traj";
-    if (!ros::param::get(param_name, interpolate_traj_))
-    {
-      interpolate_traj_ = true;
-      ROS_WARN_COND(param_verbosity >= Verbosity::WARN, "No interpolate_traj setting, setting it to %f (rad).", interpolate_traj_);
-    }
-
-    param_name = ns + "/use_time_from_start";
-    if (!ros::param::get(param_name, use_time_from_start_))
-    {
-      use_time_from_start_ = true;
-      ROS_WARN_COND(param_verbosity >= Verbosity::WARN, "No use_time_from_start setting, setting it to %f (rad).", use_time_from_start_);
-    }
-
-    param_name = ns + "/path_progression_dist_thr_min";
-    if (!ros::param::get(param_name, path_progression_dist_thr_min_))
-    {
-      path_progression_dist_thr_min_ = path_end_dist_thr_;
-      ROS_WARN_COND(param_verbosity >= Verbosity::WARN, "No path_progression_dist_thr_min setting, setting it to %f (rad).", path_progression_dist_thr_min_);
-    }
-
-    param_name = ns + "/reconnect_path";
-    if (!ros::param::get(param_name, reconnect_path_))
-    {
-      reconnect_path_ = true;
-      ROS_WARN_COND(param_verbosity >= Verbosity::WARN, "No reconnect_path setting, setting it to %f (rad).", reconnect_path_);
-    }
-
-    param_name = ns + "/set_first_wp_speed";
-    if (!ros::param::get(param_name, set_first_wp_speed_))
-    {
-      set_first_wp_speed_ = false;
-      ROS_WARN_COND(param_verbosity >= Verbosity::WARN, "No set_first_wp_speed setting, setting it to %f (rad).", set_first_wp_speed_);
-    }
-
-    param_name = ns + "/pub_singple_wp";
-    if (!ros::param::get(param_name, pub_singple_wp_))
-    {
-      pub_singple_wp_ = false;
-      ROS_WARN_COND(param_verbosity >= Verbosity::WARN, "No pub_singple_wp setting, setting it to %f (rad).", pub_singple_wp_);
     }
 
     absolute_time_from_start_ = trajectory_lead_time_;
@@ -1465,8 +1339,7 @@ namespace explorer
     {
       return v_narrow_env_max_;
     }
-    else
-    {
+    else {
       return v_max_;
     }
   }
