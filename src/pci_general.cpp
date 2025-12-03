@@ -769,34 +769,60 @@ namespace explorer
           pci_status_ = PCIStatus::kReady;
           ROS_WARN_COND(global_verbosity >= Verbosity::PLANNER_STATUS, "PCI: Ready to trigger the planner.");
         }
+        if (pci_status_ == PCIStatus::kRunning)
+        {
+          geometry_msgs::PoseStamped ps;
+          ps.pose = executing_path_[path_waypoint_ind_];
+          StateVec s;
+          convert(ps.pose, s);
+          s(4) = 0;
+          convert(s, ps.pose);
+          ps.header.frame_id = "world";
+          carrot_pose_pub_.publish(ps);
+          geometry_msgs::PointStamped pts;
+          pts.point = ps.pose.position;
+          pts.header.frame_id = "map";
+          carrot_point_pub_.publish(pts);
+          // Publish ps as a path
+          nav_msgs::Path path;
+          path.header.frame_id = "world";
+          path.header.stamp = ros::Time::now();
+          path.poses.push_back(ps);
+          if(pub_singple_wp_)
+            path_pub_.publish(path);
+          double pitch_cmd = euler_custom.y();
+          std_msgs::Float64 pitch_msg;
+          pitch_msg.data = pitch_cmd;
+          act_cam_angle_pub_.publish(pitch_msg);
+        }
       }
 
-      if (pci_status_ == PCIStatus::kRunning)
-      {
-        geometry_msgs::PoseStamped ps;
-        ps.pose = executing_path_[path_waypoint_ind_];
-        StateVec s;
-        convert(ps.pose, s);
-        s(4) = 0;
-        convert(s, ps.pose);
-        ps.header.frame_id = "world";
-        carrot_pose_pub_.publish(ps);
-        geometry_msgs::PointStamped pts;
-        pts.point = ps.pose.position;
-        pts.header.frame_id = "map";
-        carrot_point_pub_.publish(pts);
-        // Publish ps as a path
-        nav_msgs::Path path;
-        path.header.frame_id = "world";
-        path.header.stamp = ros::Time::now();
-        path.poses.push_back(ps);
-        if(pub_singple_wp_)
-          path_pub_.publish(path);
-        double pitch_cmd = euler_custom.y();
-        std_msgs::Float64 pitch_msg;
-        pitch_msg.data = pitch_cmd;
-        act_cam_angle_pub_.publish(pitch_msg);
-      }
+      // if (pci_status_ == PCIStatus::kRunning)
+      // {
+      //   geometry_msgs::PoseStamped ps;
+      //   ps.pose = executing_path_[path_waypoint_ind_];
+      //   StateVec s;
+      //   convert(ps.pose, s);
+      //   s(4) = 0;
+      //   convert(s, ps.pose);
+      //   ps.header.frame_id = "world";
+      //   carrot_pose_pub_.publish(ps);
+      //   geometry_msgs::PointStamped pts;
+      //   pts.point = ps.pose.position;
+      //   pts.header.frame_id = "map";
+      //   carrot_point_pub_.publish(pts);
+      //   // Publish ps as a path
+      //   nav_msgs::Path path;
+      //   path.header.frame_id = "world";
+      //   path.header.stamp = ros::Time::now();
+      //   path.poses.push_back(ps);
+      //   if(pub_singple_wp_)
+      //     path_pub_.publish(path);
+      //   double pitch_cmd = euler_custom.y();
+      //   std_msgs::Float64 pitch_msg;
+      //   pitch_msg.data = pitch_cmd;
+      //   act_cam_angle_pub_.publish(pitch_msg);
+      // }
     }
   }
 
