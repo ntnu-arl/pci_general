@@ -761,7 +761,7 @@ namespace explorer
 
       double delta_pitch = std::abs(wp_pitch - current_cam_pitch_);
       truncateYaw(delta_pitch);
-      std::cout << "wp_dist: " << wp_dist << ", dist_thr: " << dist_thr << ", delta_yaw: " << delta_yaw << ", yaw_thr: " << yaw_thr << ", delta_pitch: " << delta_pitch << ", path_thr: " << path_progression_pitch_thr_ << std::endl;
+      // std::cout << "wp_dist: " << wp_dist << ", dist_thr: " << dist_thr << ", delta_yaw: " << delta_yaw << ", yaw_thr: " << yaw_thr << ", delta_pitch: " << delta_pitch << ", path_thr: " << path_progression_pitch_thr_ << std::endl;
       if (wp_dist <= dist_thr && delta_yaw <= yaw_thr && delta_pitch <= path_progression_pitch_thr_)
       {
         ++path_waypoint_ind_;
