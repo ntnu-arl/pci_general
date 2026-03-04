@@ -1105,7 +1105,7 @@ namespace explorer
     // Extend the path to current position if necessary to achieve better transition.
     // Check if the path starts from current pose.
     const double kLimLow = 0.75; // all magic numbers
-    const double kLimHigh = 1.5;
+    const double kLimHigh = 2.5;
     Eigen::Vector3d root_pos(path[0].position.x, path[0].position.y, path[0].position.z);
     Eigen::Vector3d second_pos(path[1].position.x, path[1].position.y, path[1].position.z);
     Eigen::Vector3d cur_pos(current_pose_.position.x, current_pose_.position.y, current_pose_.position.z);
