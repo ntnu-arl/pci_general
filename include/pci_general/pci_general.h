@@ -166,6 +166,9 @@ class PCIGeneral : public PCIManager {
     truncateAngle(delta_theta);
     delta_theta = std::abs(delta_theta);
     double path_length = pathLength(path);
+    // A rotation in place has no translational distance to interpolate over.
+    if (path_length <= 1e-6)
+      return;
     double prev_yaw = first_point[3];
     for(int i=1; i<path.size()-1; ++i)
     {

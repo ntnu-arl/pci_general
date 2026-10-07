@@ -752,15 +752,18 @@ namespace explorer
       else
       {
         dist_thr = path_end_dist_thr_;
+        yaw_thr = path_end_yaw_thr_;
       }
 
       double wp_dist = calculateDistance(current_pose_, executing_path_[path_waypoint_ind_]);
       
       double delta_yaw = std::abs(wp_yaw - current_yaw);
       truncateYaw(delta_yaw);
+      delta_yaw = std::abs(delta_yaw);
 
       double delta_pitch = std::abs(wp_pitch - current_cam_pitch_);
       truncateYaw(delta_pitch);
+      delta_pitch = std::abs(delta_pitch);
       if (wp_dist <= dist_thr && delta_yaw <= yaw_thr && delta_pitch <= path_progression_pitch_thr_)
       {
         ++path_waypoint_ind_;
@@ -1063,7 +1066,7 @@ namespace explorer
         current_speed = 0.0;
       }
 
-      if (trans_time < rot_time)
+      if (trans_time < rot_time && dir_vec.norm() > 1e-6)
       {
         // Re-assign another heading.
         yaw_now = yaw_prev + trans_time * yaw_rate_max_ * ((dyaw >= 0) ? 1.0 : -1.0);
@@ -1092,7 +1095,10 @@ namespace explorer
         path[i].orientation.w = q_eigen.w();
       }
       yaw_prev = yaw_now;
-      prev_vel = dir_vec.normalized() * end_speed;
+      if (dir_vec.norm() > 1e-6)
+        prev_vel = dir_vec.normalized() * end_speed;
+      else
+        prev_vel.setZero();
     }
   }
 
