@@ -27,7 +27,40 @@ namespace explorer
     execution_timer_ = nh_.createTimer(
         ros::Duration(0.05), &PCIGeneral::executionTimerCallback, this);
 
+    yaw_scan_service_ = nh_.advertiseService("/pci_general/initialization_yaw_scan", &PCIGeneral::startYawScan, this);
+    yaw_scan_status_service_ = nh_.advertiseService("/pci_general/initialization_yaw_scan_status", &PCIGeneral::yawScanStatus, this);
+
     current_path_type_ = ExecutionPathType::kLocalPath;
+  }
+
+  void PCIGeneral::queueYawScan(const geometry_msgs::Pose &pose, double motion_duration)
+  {
+    init_yaw_scan_pose_ = pose;
+    init_yaw_scan_active_ = true;
+    init_yaw_scan_rotating_ = false;
+    init_yaw_scan_commanded_ = 0.0;
+    init_yaw_scan_measured_ = 0.0;
+    init_yaw_scan_settled_since_ = ros::Time(0);
+    init_yaw_scan_deadline_ = ros::Time::now() +
+        ros::Duration(motion_duration + 2.0 * M_PI / init_yaw_scan_rate_ + 30.0);
+    pci_status_ = PCIStatus::kRunning;
+  }
+
+  bool PCIGeneral::startYawScan(std_srvs::Trigger::Request &, std_srvs::Trigger::Response &response)
+  {
+    response.success = init_yaw_scan_enable_ && pci_status_ == PCIStatus::kReady && !force_stop_;
+    response.message = response.success ? "Yaw scan queued at current position" : "Yaw scan disabled or PCI not ready";
+    if (response.success)
+      queueYawScan(current_pose_, 0.0);
+    return true;
+  }
+
+  bool PCIGeneral::yawScanStatus(std_srvs::Trigger::Request &, std_srvs::Trigger::Response &response)
+  {
+    response.success = !init_yaw_scan_active_ && init_yaw_scan_measured_ >= 2.0 * M_PI - 0.1 &&
+                       pci_status_ == PCIStatus::kReady;
+    response.message = init_yaw_scan_active_ ? "running" : (response.success ? "completed" : "failed or cancelled");
+    return true;
   }
 
   void PCIGeneral::statusCallback(const mav_msgs::Status &status)
@@ -148,6 +181,8 @@ namespace explorer
 
     std::vector<geometry_msgs::Pose> path_new;
     interpolatePath(init_path, path_new, v_init_max_, yaw_rate_max_);
+    if (init_yaw_scan_enable_)
+      path_new.push_back(init_path.back()); // Reach the exact hover position before starting the scan.
 
     executing_path_ = path_new;
 
@@ -205,6 +240,13 @@ namespace explorer
 
     pci_status_ = PCIStatus::kRunning;
     double wait_time = sum_time_from_start;
+
+    if (init_yaw_scan_enable_)
+    {
+      queueYawScan(init_path.back(), sum_time_from_start);
+      ROS_INFO("Initialization yaw scan queued: waiting for final initialization position");
+      return true; // Timer keeps callbacks responsive and PCI running until the scan finishes.
+    }
 
     ROS_INFO(". . . waiting initMotion()");
     ros::Duration(5.0).sleep();
@@ -691,13 +733,100 @@ namespace explorer
   }
 
 
+  void PCIGeneral::publishInitializationPose(const geometry_msgs::Pose &pose)
+  {
+    // A single pose prevents position-only waypoint consumers skipping stationary yaw targets.
+    output_path_.header.seq = ++n_seq_;
+    output_path_.header.stamp = ros::Time::now();
+    output_path_.header.frame_id = world_frame_id_;
+    geometry_msgs::PoseStamped stamped;
+    stamped.header = output_path_.header;
+    stamped.pose = pose;
+    output_path_.poses.assign(1, stamped);
+    trajectory_point_.position_W = Eigen::Vector3d(pose.position.x, pose.position.y, pose.position.z);
+    trajectory_point_.setFromYaw(tf::getYaw(pose.orientation));
+    mav_msgs::msgMultiDofJointTrajectoryPointFromEigen(trajectory_point_, &trajectory_point_msg_);
+    trajectory_point_msg_.time_from_start = ros::Duration(0.0);
+    samples_array_.header = output_path_.header;
+    samples_array_.points.assign(1, trajectory_point_msg_);
+    trajectory_pub_.publish(samples_array_);
+    path_pub_.publish(output_path_);
+  }
+
+  void PCIGeneral::updateInitializationYawScan()
+  {
+    const ros::Time now = ros::Time::now();
+    const double position_tolerance = 0.3;
+    const double yaw_tolerance = 0.1;
+    if (now > init_yaw_scan_deadline_)
+    {
+      init_yaw_scan_active_ = false;
+      pci_status_ = PCIStatus::kError;
+      publishInitializationPose(current_pose_);
+      ROS_ERROR("Initialization yaw scan timed out; holding current pose");
+      return;
+    }
+    const double yaw = tf::getYaw(current_pose_.orientation);
+    if (!init_yaw_scan_rotating_)
+    {
+      if (calculateDistance(current_pose_, init_yaw_scan_pose_) > position_tolerance ||
+          current_vel_.norm() > 0.15)
+      {
+        init_yaw_scan_settled_since_ = ros::Time(0);
+        return;
+      }
+      if (init_yaw_scan_settled_since_.isZero())
+        init_yaw_scan_settled_since_ = now;
+      if ((now - init_yaw_scan_settled_since_).toSec() < 0.5)
+        return;
+      init_yaw_scan_rotating_ = true;
+      init_yaw_scan_start_yaw_ = yaw;
+      init_yaw_scan_last_yaw_ = yaw;
+      init_yaw_scan_last_time_ = now;
+      ROS_INFO("Starting initialization 360-degree yaw scan at %.3f rad/s", init_yaw_scan_rate_);
+    }
+    const double delta = yaw - init_yaw_scan_last_yaw_;
+    init_yaw_scan_measured_ += std::atan2(std::sin(delta), std::cos(delta));
+    init_yaw_scan_last_yaw_ = yaw;
+    // Do not jump the heading reference after a delayed callback or a clock discontinuity.
+    const double dt = std::max(0.0, std::min(0.1, (now - init_yaw_scan_last_time_).toSec()));
+    init_yaw_scan_last_time_ = now;
+    if (calculateDistance(current_pose_, init_yaw_scan_pose_) <= position_tolerance)
+      init_yaw_scan_commanded_ = std::min(2.0 * M_PI, init_yaw_scan_commanded_ + init_yaw_scan_rate_ * dt);
+    geometry_msgs::Pose target = init_yaw_scan_pose_;
+    target.orientation = tf::createQuaternionMsgFromYaw(init_yaw_scan_start_yaw_ + init_yaw_scan_commanded_);
+    publishInitializationPose(target);
+    const double heading_error = std::atan2(std::sin(yaw - init_yaw_scan_start_yaw_),
+                                            std::cos(yaw - init_yaw_scan_start_yaw_));
+    if (init_yaw_scan_commanded_ >= 2.0 * M_PI &&
+        init_yaw_scan_measured_ >= 2.0 * M_PI - yaw_tolerance &&
+        std::abs(heading_error) <= yaw_tolerance &&
+        calculateDistance(current_pose_, target) <= position_tolerance)
+    {
+      init_yaw_scan_active_ = false;
+      pci_status_ = PCIStatus::kReady;
+      ROS_INFO("initMotion() - Done: measured yaw scan %.3f rad", init_yaw_scan_measured_);
+    }
+  }
+
   void PCIGeneral::executionTimerCallback(const ros::TimerEvent &event)
   {
     if (force_stop_)
     {
+      if (init_yaw_scan_active_)
+      {
+        init_yaw_scan_active_ = false;
+        publishInitializationPose(current_pose_);
+        ROS_INFO("Initialization yaw scan cancelled; holding current pose");
+      }
       force_stop_ = false;
       pci_status_ = PCIStatus::kError;
       path_waypoint_ind_ = 0;
+    }
+    if (init_yaw_scan_active_)
+    {
+      updateInitializationYawScan();
+      return;
     }
     if (pci_status_ == PCIStatus::kRunning)
     {
@@ -1252,6 +1381,14 @@ namespace explorer
     {
       init_x_forward_ = 0.0;
       ROS_WARN_COND(param_verbosity >= Verbosity::WARN, "No init_motion/x_forward setting, set it to 0.0 (s).");
+    }
+
+    ros::param::param(ns + "/init_motion/yaw_scan_enable", init_yaw_scan_enable_, false);
+    ros::param::param(ns + "/init_motion/yaw_scan_rate", init_yaw_scan_rate_, 0.35);
+    if (!std::isfinite(init_yaw_scan_rate_) || init_yaw_scan_rate_ <= 0.0)
+    {
+      ROS_ERROR("init_motion/yaw_scan_rate must be finite and positive");
+      return false;
     }
 
     param_name = ns + "/save_map_service";

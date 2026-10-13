@@ -227,6 +227,12 @@ class PCIGeneral : public PCIManager {
   ros::Subscriber trajectory_sub_;
   ros::Subscriber cam_pitch_sub_;
 
+  ros::ServiceServer yaw_scan_service_;
+  ros::ServiceServer yaw_scan_status_service_;
+  bool startYawScan(std_srvs::Trigger::Request &, std_srvs::Trigger::Response &);
+  bool yawScanStatus(std_srvs::Trigger::Request &, std_srvs::Trigger::Response &);
+  void queueYawScan(const geometry_msgs::Pose &pose, double motion_duration);
+
   ros::Timer execution_timer_;
 
   RunModeType run_mode_;
@@ -268,6 +274,20 @@ class PCIGeneral : public PCIManager {
   double init_z_takeoff_;
   double init_z_drop_;
   double init_x_forward_;
+  bool init_yaw_scan_enable_ = false;
+  double init_yaw_scan_rate_ = 0.35;
+  bool init_yaw_scan_active_ = false;
+  bool init_yaw_scan_rotating_ = false;
+  geometry_msgs::Pose init_yaw_scan_pose_;
+  double init_yaw_scan_start_yaw_ = 0.0;
+  double init_yaw_scan_last_yaw_ = 0.0;
+  double init_yaw_scan_measured_ = 0.0;
+  double init_yaw_scan_commanded_ = 0.0;
+  ros::Time init_yaw_scan_last_time_;
+  ros::Time init_yaw_scan_settled_since_;
+  ros::Time init_yaw_scan_deadline_;
+  void updateInitializationYawScan();
+  void publishInitializationPose(const geometry_msgs::Pose &pose);
 
   ExecutionPathType current_path_type_;
 

@@ -4,6 +4,8 @@ init_motion_enable: true
 planner_trigger_lead_time: 0.0
 smooth_heading_enable: true
 init_motion:
+  yaw_scan_enable: false # Turn 360 degrees after reaching the final initialization position.
+  yaw_scan_rate: 0.35 # Positive yaw reference rate [rad/s], about 20 degrees/s.
   z_takeoff: 2.0
   z_drop: 0.5
   x_forward: 0.5
