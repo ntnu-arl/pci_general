@@ -9,17 +9,17 @@ namespace explorer
                            const ros::NodeHandle &nh_private)
       : PCIManager(nh, nh_private)
   {
-    trajectory_pub_ = nh_.advertise<trajectory_msgs::MultiDOFJointTrajectory>(
+    trajectory_pub_ = nh_.advertise<trajectory_msgs::msg::MultiDOFJointTrajectory>(
         mav_msgs::default_topics::COMMAND_TRAJECTORY, 10); //"command/trajectory"
 
-    path_pub_ = nh_.advertise<nav_msgs::Path>("/gbplanner_path", 10);
-    is_homing_pub_ = nh_.advertise<std_msgs::Bool>("/gbplanner_is_homing", 10);
+    path_pub_ = nh_.advertise<nav_msgs::msg::Path>("/gbplanner_path", 10);
+    is_homing_pub_ = nh_.advertise<std_msgs::msg::Bool>("/gbplanner_is_homing", 10);
 
     status_sub_ = nh_.subscribe("/matrice/status", 10, &PCIGeneral::statusCallback, this);
-    robot_status_pub_ = nh_.advertise<planner_msgs::RobotStatus>("/robot_status", 10);
-    carrot_pose_pub_ = nh_.advertise<geometry_msgs::PoseStamped>("pci_carrot", 10);
-    carrot_point_pub_ = nh_.advertise<geometry_msgs::PointStamped>("pci_carrot_point", 10);
-    act_cam_angle_pub_ = nh_.advertise<std_msgs::Float64>("act_cam_cmd", 10);
+    robot_status_pub_ = nh_.advertise<planner_msgs::msg::RobotStatus>("/robot_status", 10);
+    carrot_pose_pub_ = nh_.advertise<geometry_msgs::msg::PoseStamped>("pci_carrot", 10);
+    carrot_point_pub_ = nh_.advertise<geometry_msgs::msg::PointStamped>("pci_carrot_point", 10);
+    act_cam_angle_pub_ = nh_.advertise<std_msgs::msg::Float64>("act_cam_cmd", 10);
 
     trajectory_sub_ = nh_.subscribe("/pci_general/path_following", 10, &PCIGeneral::pathFollowingCallback, this);
     cam_pitch_sub_ = nh_.subscribe("cam_pitch", 10, &PCIGeneral::camPitchCallback, this);
@@ -30,10 +30,9 @@ namespace explorer
     current_path_type_ = ExecutionPathType::kLocalPath;
   }
 
-  void PCIGeneral::statusCallback(const mav_msgs::Status &status)
+  void PCIGeneral::statusCallback(const mav_msgs::msg::Status &status)
   {
-    planner_msgs::RobotStatus msg;
-    msg.header.seq = status.header.seq;
+    planner_msgs::msg::RobotStatus msg;
     msg.header.stamp = status.header.stamp;
     msg.header.frame_id = status.header.frame_id;
 
@@ -54,7 +53,7 @@ namespace explorer
     if (run_mode_ == RunModeType::kSim)
     {
       // Interface with RotorS.
-      std_srvs::Empty srv;
+      ros1_compat::Srv<std_srvs::srv::Empty> srv;
       bool unpaused = ros::service::call("/gazebo/unpause_physics", srv);
 
       // Trying to unpause Gazebo for 10 seconds.
@@ -100,9 +99,9 @@ namespace explorer
     ROS_INFO("Current pose: %f, %f, %f", current_pose_.position.x,
              current_pose_.position.y, current_pose_.position.z);
 
-    std::vector<geometry_msgs::Pose> init_path;
+    std::vector<geometry_msgs::msg::Pose> init_path;
     {
-      geometry_msgs::Pose pose;
+      geometry_msgs::msg::Pose pose;
       pose.position.x = current_pose_.position.x;
       pose.position.y = current_pose_.position.y;
       pose.position.z = current_pose_.position.z;
@@ -113,7 +112,7 @@ namespace explorer
       init_path.push_back(pose);
     }
     {
-      geometry_msgs::Pose pose;
+      geometry_msgs::msg::Pose pose;
       pose.position.x = current_pose_.position.x;
       pose.position.y = current_pose_.position.y;
       pose.position.z = current_pose_.position.z + init_z_takeoff_;
@@ -124,7 +123,7 @@ namespace explorer
       init_path.push_back(pose);
     }
     {
-      geometry_msgs::Pose pose;
+      geometry_msgs::msg::Pose pose;
       pose.position.x = current_pose_.position.x;
       pose.position.y = current_pose_.position.y;
       pose.position.z = current_pose_.position.z + init_z_takeoff_ - init_z_drop_;
@@ -135,7 +134,7 @@ namespace explorer
       init_path.push_back(pose);
     }
     {
-      geometry_msgs::Pose pose;
+      geometry_msgs::msg::Pose pose;
       pose.position.x = current_pose_.position.x + init_x_forward_;
       pose.position.y = current_pose_.position.y;
       pose.position.z = current_pose_.position.z + init_z_takeoff_ - init_z_drop_;
@@ -146,13 +145,12 @@ namespace explorer
       init_path.push_back(pose);
     }
 
-    std::vector<geometry_msgs::Pose> path_new;
+    std::vector<geometry_msgs::msg::Pose> path_new;
     interpolatePath(init_path, path_new, v_init_max_, yaw_rate_max_);
 
     executing_path_ = path_new;
 
     n_seq_++;
-    samples_array_.header.seq = n_seq_;
     samples_array_.header.stamp = ros::Time::now();
     samples_array_.header.frame_id = world_frame_id_;
     samples_array_.points.clear();
@@ -193,7 +191,7 @@ namespace explorer
           ros::Duration(sum_time_from_start);
       samples_array_.points.push_back(trajectory_point_msg_);
 
-      geometry_msgs::PoseStamped tmp;
+      geometry_msgs::msg::PoseStamped tmp;
       tmp.header = samples_array_.header;
       tmp.pose = path_new[i];
       output_path_.poses.push_back(tmp);
@@ -243,7 +241,7 @@ namespace explorer
     return splits;
   }
 
-  void PCIGeneral::pathFollowingCallback(const std_msgs::String::ConstPtr &msg)
+  void PCIGeneral::pathFollowingCallback(const std_msgs::msg::String::ConstSharedPtr &msg)
   {
     // std::cout << "Path following cb" << std::endl;
     std::string filename = msg->data;
@@ -292,10 +290,10 @@ namespace explorer
       return;
 
     ROS_WARN_COND(global_verbosity >= Verbosity::INFO, "Generating %d waypoints.", (int)waypoints.size());
-    std::vector<geometry_msgs::Pose> path_new, mod_path;
+    std::vector<geometry_msgs::msg::Pose> path_new, mod_path;
     for (auto &wp : waypoints)
     {
-      geometry_msgs::Pose pose;
+      geometry_msgs::msg::Pose pose;
       pose.position.x = current_pose_.position.x + wp[0];
       pose.position.y = current_pose_.position.y + wp[1];
       pose.position.z = current_pose_.position.z + wp[2];
@@ -315,19 +313,18 @@ namespace explorer
     return;
   }
 
-  visualization_msgs::MarkerArray::Ptr PCIGeneral::generateTrajectoryMarkerArray(const trajectory_msgs::MultiDOFJointTrajectory &traj) const
+  visualization_msgs::msg::MarkerArray::SharedPtr PCIGeneral::generateTrajectoryMarkerArray(const trajectory_msgs::msg::MultiDOFJointTrajectory &traj) const
   {
-    auto m_arr = boost::make_shared<visualization_msgs::MarkerArray>();
+    auto m_arr = std::make_shared<visualization_msgs::msg::MarkerArray>();
 
-    visualization_msgs::Marker me;
+    visualization_msgs::msg::Marker me;
     me.points.resize(2);
     me.header.stamp = traj.header.stamp;
-    me.header.seq = traj.header.seq;
     me.header.frame_id = traj.header.frame_id;
     me.id = 0;
     me.ns = "command_trajectory_edges";
-    me.type = visualization_msgs::Marker::ARROW;
-    me.action = visualization_msgs::Marker::ADD;
+    me.type = visualization_msgs::msg::Marker::ARROW;
+    me.action = visualization_msgs::msg::Marker::ADD;
     me.pose.position.x = 0;
     me.pose.position.y = 0;
     me.pose.position.z = 0;
@@ -346,14 +343,13 @@ namespace explorer
     me.lifetime = ros::Duration(0.0);
     me.frame_locked = false;
 
-    visualization_msgs::Marker mo;
+    visualization_msgs::msg::Marker mo;
     mo.header.stamp = traj.header.stamp;
-    mo.header.seq = traj.header.seq;
     mo.header.frame_id = traj.header.frame_id;
     mo.id = 0;
     mo.ns = "command_trajectory_orientations";
-    mo.type = visualization_msgs::Marker::ARROW;
-    mo.action = visualization_msgs::Marker::ADD;
+    mo.type = visualization_msgs::msg::Marker::ARROW;
+    mo.action = visualization_msgs::msg::Marker::ADD;
     mo.scale.x = 0.75;
     mo.scale.y = 0.175;
     mo.scale.z = 0.175;
@@ -405,19 +401,19 @@ namespace explorer
     return m_arr;
   }
 
-  bool PCIGeneral::goToWaypoint(geometry_msgs::Pose &pose)
+  bool PCIGeneral::goToWaypoint(geometry_msgs::msg::Pose &pose)
   {
     ROS_WARN_COND(global_verbosity >= Verbosity::INFO, "Going to waypoint.");
     // From current pose to the target pose.
-    std::vector<geometry_msgs::Pose> path{current_pose_, pose};
-    std::vector<geometry_msgs::Pose> path_to_exe;
+    std::vector<geometry_msgs::msg::Pose> path{current_pose_, pose};
+    std::vector<geometry_msgs::msg::Pose> path_to_exe;
     executePath(path, path_to_exe, ExecutionPathType::kManualPath);
     return true;
   }
 
   bool PCIGeneral::executePath(
-      const std::vector<geometry_msgs::Pose> &path,
-      std::vector<geometry_msgs::Pose> &modified_path,
+      const std::vector<geometry_msgs::msg::Pose> &path,
+      std::vector<geometry_msgs::msg::Pose> &modified_path,
       ExecutionPathType path_type)
   {
     if(mission_start_time_ < 0)
@@ -437,8 +433,8 @@ namespace explorer
       is_homing_ = true;
       if (!save_map_service_.empty())
       {
-        ros::ServiceClient client = nh_.serviceClient<std_srvs::Trigger>(save_map_service_);
-        std_srvs::Trigger trig;
+        ros::ServiceClient client = nh_.serviceClient<std_srvs::srv::Trigger>(save_map_service_);
+        ros1_compat::Srv<std_srvs::srv::Trigger> trig;
         if (client.call(trig))
         {
           ROS_WARN_COND(global_verbosity >= Verbosity::INFO, "TRIGGER SAVE-MAP SERVICE.");
@@ -465,7 +461,7 @@ namespace explorer
 
     current_path_type_ = path_type;
 
-    std::vector<geometry_msgs::Pose> path_new = path;
+    std::vector<geometry_msgs::msg::Pose> path_new = path;
     if (path_type != ExecutionPathType::kManualPath)
     {
       ROS_WARN("Path type not kManual");
@@ -510,7 +506,7 @@ namespace explorer
     // Execute the path.
     // No need to interpolate the path in case of MPC.
     n_seq_++;
-    std::vector<geometry_msgs::Pose> path_intp;
+    std::vector<geometry_msgs::msg::Pose> path_intp;
     
     if(interpolate_traj_)
       interpolatePath(path_new, path_intp);
@@ -533,7 +529,6 @@ namespace explorer
 
     executing_path_ = path_intp;
     
-    samples_array_.header.seq = n_seq_;
     samples_array_.header.stamp = ros::Time::now();
     samples_array_.header.frame_id = world_frame_id_;
     samples_array_.points.clear();
@@ -599,7 +594,7 @@ namespace explorer
               vel = aloc_speed * (p_2 - p_0).normalized();
             }
           }
-          geometry_msgs::Twist twist;
+          geometry_msgs::msg::Twist twist;
           twist.linear.x = vel.x();
           twist.linear.y = vel.y();
           twist.linear.z = vel.z();
@@ -671,7 +666,7 @@ namespace explorer
           ros::Duration(sum_time_from_start);
       samples_array_.points.push_back(trajectory_point_msg_);
 
-      geometry_msgs::PoseStamped tmp;
+      geometry_msgs::msg::PoseStamped tmp;
       tmp.header = samples_array_.header;
       tmp.pose = path_intp[i];
       output_path_.poses.push_back(tmp);
@@ -681,7 +676,7 @@ namespace explorer
     trajectory_pub_.publish(samples_array_);
     path_pub_.publish(output_path_);
 
-    std_msgs::Bool is_homing_msg; 
+    std_msgs::msg::Bool is_homing_msg; 
     is_homing_msg.data = is_homing_;
     is_homing_pub_.publish(is_homing_msg);
     pci_status_ = PCIStatus::kRunning;
@@ -773,7 +768,7 @@ namespace explorer
       }
       if (pci_status_ == PCIStatus::kRunning)
       {
-        geometry_msgs::PoseStamped ps;
+        geometry_msgs::msg::PoseStamped ps;
         ps.pose = executing_path_[path_waypoint_ind_];
         StateVec s;
         convert(ps.pose, s);
@@ -781,19 +776,19 @@ namespace explorer
         convert(s, ps.pose);
         ps.header.frame_id = "world";
         carrot_pose_pub_.publish(ps);
-        geometry_msgs::PointStamped pts;
+        geometry_msgs::msg::PointStamped pts;
         pts.point = ps.pose.position;
         pts.header.frame_id = "map";
         carrot_point_pub_.publish(pts);
         // Publish ps as a path
-        nav_msgs::Path path;
+        nav_msgs::msg::Path path;
         path.header.frame_id = "world";
         path.header.stamp = ros::Time::now();
         path.poses.push_back(ps);
         if(pub_singple_wp_)
           path_pub_.publish(path);
         double pitch_cmd = euler_custom.y();
-        std_msgs::Float64 pitch_msg;
+        std_msgs::msg::Float64 pitch_msg;
         pitch_msg.data = pitch_cmd;
         act_cam_angle_pub_.publish(pitch_msg);
       }
@@ -827,13 +822,13 @@ namespace explorer
     }
   }
 
-  void PCIGeneral::camPitchCallback(const sensor_msgs::JointState &state)
+  void PCIGeneral::camPitchCallback(const sensor_msgs::msg::JointState &state)
   {
     current_cam_pitch_ = state.position[0];
   }
 
   double PCIGeneral::getEndPointDistanceAlongPath(
-      const std::vector<geometry_msgs::Pose> &path)
+      const std::vector<geometry_msgs::msg::Pose> &path)
   {
     std::vector<double> dists;
     for (int i = path_waypoint_ind_; i < path.size(); ++i)
@@ -854,8 +849,8 @@ namespace explorer
     return total_dist;
   }
 
-  double PCIGeneral::calculateDistance(const geometry_msgs::Pose &p1,
-                                        const geometry_msgs::Pose &p2)
+  double PCIGeneral::calculateDistance(const geometry_msgs::msg::Pose &p1,
+                                        const geometry_msgs::msg::Pose &p2)
   {
     Eigen::Vector3d v1(p1.position.x, p1.position.y, p1.position.z);
     Eigen::Vector3d v2(p2.position.x, p2.position.y, p2.position.z);
@@ -872,8 +867,8 @@ namespace explorer
     return delta;
   }
 
-  void PCIGeneral::interpolatePath(const std::vector<geometry_msgs::Pose> &path,
-                                    std::vector<geometry_msgs::Pose> &path_res)
+  void PCIGeneral::interpolatePath(const std::vector<geometry_msgs::msg::Pose> &path,
+                                    std::vector<geometry_msgs::msg::Pose> &path_res)
   {
     path_res.clear();
     if (path.size() == 0)
@@ -919,7 +914,7 @@ namespace explorer
           tf::Quaternion quat;
           quat.setEuler(0.0, 0.0, yaw);
           tf::Pose poseTF(quat, origin);
-          geometry_msgs::Pose pose;
+          geometry_msgs::msg::Pose pose;
           tf::poseTFToMsg(poseTF, pose);
           path_res.push_back(pose);
         }
@@ -929,8 +924,8 @@ namespace explorer
     path_res.push_back(path.back());
   }
 
-  void PCIGeneral::interpolatePath(const std::vector<geometry_msgs::Pose> &path,
-                                    std::vector<geometry_msgs::Pose> &path_res, double v_max,
+  void PCIGeneral::interpolatePath(const std::vector<geometry_msgs::msg::Pose> &path,
+                                    std::vector<geometry_msgs::msg::Pose> &path_res, double v_max,
                                     double yaw_rate_max)
   {
     for (int i = 0; i < (path.size() - 1); ++i)
@@ -964,14 +959,14 @@ namespace explorer
         tf::Quaternion quat;
         quat.setEuler(0.0, 0.0, yaw);
         tf::Pose poseTF(quat, origin);
-        geometry_msgs::Pose pose;
+        geometry_msgs::msg::Pose pose;
         tf::poseTFToMsg(poseTF, pose);
         path_res.push_back(pose);
       }
     }
   }
 
-  void PCIGeneral::allocateYawAlongFistSegment(std::vector<geometry_msgs::Pose> &path) const
+  void PCIGeneral::allocateYawAlongFistSegment(std::vector<geometry_msgs::msg::Pose> &path) const
   {
     // Return if only one vertex or less.
     if (path.size() <= 1)
@@ -1002,7 +997,7 @@ namespace explorer
     }
   }
 
-  void PCIGeneral::allocateYawAlongPath(std::vector<geometry_msgs::Pose> &path) const
+  void PCIGeneral::allocateYawAlongPath(std::vector<geometry_msgs::msg::Pose> &path) const
   {
     // Return if only one vertex or less.
     if (path.size() <= 1)
@@ -1097,8 +1092,8 @@ namespace explorer
     }
   }
 
-  bool PCIGeneral::reconnectPath(const std::vector<geometry_msgs::Pose> &path,
-                                  std::vector<geometry_msgs::Pose> &path_new)
+  bool PCIGeneral::reconnectPath(const std::vector<geometry_msgs::msg::Pose> &path,
+                                  std::vector<geometry_msgs::msg::Pose> &path_new)
   {
     path_new = path;
 
@@ -1443,7 +1438,7 @@ namespace explorer
     return true;
   }
 
-  void PCIGeneral::setState(const geometry_msgs::Pose &pose)
+  void PCIGeneral::setState(const geometry_msgs::msg::Pose &pose)
   {
     current_pose_.position.x = pose.position.x;
     current_pose_.position.y = pose.position.y;
@@ -1454,7 +1449,7 @@ namespace explorer
     current_pose_.orientation.w = pose.orientation.w;
   }
 
-  void PCIGeneral::setCurrentVelocity(const geometry_msgs::Vector3 &vel)
+  void PCIGeneral::setCurrentVelocity(const geometry_msgs::msg::Vector3 &vel)
   {
     current_vel_.x() = vel.x;
     current_vel_.y() = vel.y;
