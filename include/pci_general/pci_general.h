@@ -2,22 +2,24 @@
 #define PCI_GENERAL_H_
 
 #include <cmath>
-#include <ros/ros.h>
-#include <tf/tf.h>
-#include <std_srvs/Empty.h>
-#include <std_srvs/Trigger.h>
-#include <std_msgs/Int32.h>
-#include <std_msgs/String.h>
-#include <std_msgs/Bool.h>
-#include <std_msgs/Float64.h>
-#include <nav_msgs/Path.h>
-#include <mav_msgs/conversions.h>
-#include <mav_msgs/default_topics.h>
-#include <mav_msgs/Status.h>
-#include <sensor_msgs/JointState.h>
-#include <trajectory_msgs/MultiDOFJointTrajectory.h>
+#include <ros1_compat/node_handle.h>
+#include <planner_msgs/ros2_service_traits.hpp>
+#include <ros1_compat/ros1_compat.h>
+#include <std_srvs/srv/empty.hpp>
+#include <std_srvs/srv/trigger.hpp>
+#include <std_msgs/msg/int32.hpp>
+#include <std_msgs/msg/string.hpp>
+#include <std_msgs/msg/bool.hpp>
+#include <std_msgs/msg/float64.hpp>
+#include <nav_msgs/msg/path.hpp>
+#include <mav_msgs/conversions.hpp>
+#include <geometry_msgs/msg/point_stamped.hpp>
+#include <mav_msgs/default_topics.hpp>
+#include <mav_msgs/msg/status.hpp>
+#include <sensor_msgs/msg/joint_state.hpp>
+#include <trajectory_msgs/msg/multi_dof_joint_trajectory.hpp>
 #include "planner_control_interface/pci_manager.h"
-#include "planner_msgs/RobotStatus.h"
+#include <planner_msgs/msg/robot_status.hpp>
 #include <fstream>
 #include <string>
 
@@ -30,22 +32,22 @@ class PCIGeneral : public PCIManager {
   bool loadParams(const std::string ns);
   bool initialize();
   bool initMotion();
-  bool executePath(const std::vector<geometry_msgs::Pose> &path,
-                   std::vector<geometry_msgs::Pose> &modified_path,
+  bool executePath(const std::vector<geometry_msgs::msg::Pose> &path,
+                   std::vector<geometry_msgs::msg::Pose> &modified_path,
                    ExecutionPathType path_type = ExecutionPathType::kLocalPath);
-  void setState(const geometry_msgs::Pose &pose);
-  void setCurrentVelocity(const geometry_msgs::Vector3 &vel);
+  void setState(const geometry_msgs::msg::Pose &pose);
+  void setCurrentVelocity(const geometry_msgs::msg::Vector3 &vel);
   void setVelocity(double v);
   double getVelocity(ExecutionPathType path_type);
-  bool goToWaypoint(geometry_msgs::Pose &pose);
+  bool goToWaypoint(geometry_msgs::msg::Pose &pose);
   bool planAhead() {return ((planner_trigger_lead_time_>0)?true:false);}
-  void allocateYawAlongPath(std::vector<geometry_msgs::Pose> &path) const;
-  void allocateYawAlongFistSegment(std::vector<geometry_msgs::Pose> &path) const;
+  void allocateYawAlongPath(std::vector<geometry_msgs::msg::Pose> &path) const;
+  void allocateYawAlongFistSegment(std::vector<geometry_msgs::msg::Pose> &path) const;
   std::vector<std::string> split_string(std::string input_string);
-  void pathFollowingCallback(const std_msgs::String::ConstPtr& msg);
+  void pathFollowingCallback(const std_msgs::msg::String::ConstSharedPtr& msg);
   double calculateAbsDeltaAngle(double angle1, double angle2);
 
-  inline void convert(const StateVec &st, geometry_msgs::Pose &p)
+  inline void convert(const StateVec &st, geometry_msgs::msg::Pose &p)
   {
     tf::Quaternion quat;
     Eigen::Matrix3d rot_eigen;
@@ -63,7 +65,7 @@ class PCIGeneral : public PCIManager {
     tf::poseTFToMsg(poseTF, p);
   }
 
-  inline void convert(const geometry_msgs::Pose &p, StateVec &st)
+  inline void convert(const geometry_msgs::msg::Pose &p, StateVec &st)
   {
     st[0] = p.position.x;
     st[1] = p.position.y;
@@ -78,7 +80,7 @@ class PCIGeneral : public PCIManager {
     st[4] = euler_custom.y();
   }
 
-  inline void convert(const std::vector<geometry_msgs::Pose> &pose_path, std::vector<StateVec> &vec_path)
+  inline void convert(const std::vector<geometry_msgs::msg::Pose> &pose_path, std::vector<StateVec> &vec_path)
   {
     vec_path.clear();
     for(auto &p : pose_path)
@@ -89,12 +91,12 @@ class PCIGeneral : public PCIManager {
     }
   }
 
-  inline void convert(const std::vector<StateVec> &vec_path, std::vector<geometry_msgs::Pose> &pose_path)
+  inline void convert(const std::vector<StateVec> &vec_path, std::vector<geometry_msgs::msg::Pose> &pose_path)
   {
     pose_path.clear();
     for(auto &vp : vec_path)
     {
-      geometry_msgs::Pose p;
+      geometry_msgs::msg::Pose p;
       convert(vp, p);
       pose_path.push_back(p);
     }
@@ -108,7 +110,7 @@ class PCIGeneral : public PCIManager {
       angle -= 2*M_PI;
   }
 
-  inline double getDistance(const geometry_msgs::Pose &pose1, const geometry_msgs::Pose &pose2)
+  inline double getDistance(const geometry_msgs::msg::Pose &pose1, const geometry_msgs::msg::Pose &pose2)
   {
     StateVec vec1, vec2;
     convert(pose1, vec1);
@@ -116,7 +118,7 @@ class PCIGeneral : public PCIManager {
     return (vec1.head(3) - vec2.head(3)).norm();
   }
 
-  inline double pathLength(std::vector<geometry_msgs::Pose> &path)
+  inline double pathLength(std::vector<geometry_msgs::msg::Pose> &path)
   {
     double path_length = 0;
     for(int i=1; i<path.size(); ++i)
@@ -129,7 +131,7 @@ class PCIGeneral : public PCIManager {
     return path_length;
   }
 
-  inline void linearlyInterpolateYaw(std::vector<geometry_msgs::Pose> &path)  // Keeps the yaw same for first and last pose, and interpolates the rest
+  inline void linearlyInterpolateYaw(std::vector<geometry_msgs::msg::Pose> &path)  // Keeps the yaw same for first and last pose, and interpolates the rest
   {
     if(path.size() <= 2)
       return;
@@ -212,7 +214,7 @@ class PCIGeneral : public PCIManager {
 
  private:
 
-  visualization_msgs::MarkerArray::Ptr generateTrajectoryMarkerArray(const trajectory_msgs::MultiDOFJointTrajectory& traj) const;
+  visualization_msgs::msg::MarkerArray::SharedPtr generateTrajectoryMarkerArray(const trajectory_msgs::msg::MultiDOFJointTrajectory& traj) const;
 
   ros::Publisher trajectory_pub_;
   ros::Publisher path_pub_;
@@ -269,12 +271,12 @@ class PCIGeneral : public PCIManager {
   ExecutionPathType current_path_type_;
 
   bool concatenate_path_enable_ = true;
-  std::vector<geometry_msgs::Pose> executing_path_;
+  std::vector<geometry_msgs::msg::Pose> executing_path_;
 
-  trajectory_msgs::MultiDOFJointTrajectory samples_array_;
+  trajectory_msgs::msg::MultiDOFJointTrajectory samples_array_;
   mav_msgs::EigenTrajectoryPoint trajectory_point_;
-  trajectory_msgs::MultiDOFJointTrajectoryPoint trajectory_point_msg_;
-  nav_msgs::Path output_path_;
+  trajectory_msgs::msg::MultiDOFJointTrajectoryPoint trajectory_point_msg_;
+  nav_msgs::msg::Path output_path_;
 
   double current_cam_pitch_;
 
@@ -290,22 +292,22 @@ class PCIGeneral : public PCIManager {
   double mission_start_time_ = -1.0;
   const double kVelMax = 2.0;
   const double kVelMin = 0.2;
-  void interpolatePath(const std::vector<geometry_msgs::Pose> &path,
-                       std::vector<geometry_msgs::Pose> &path_res);
-  void interpolatePath(const std::vector<geometry_msgs::Pose> &path,
-                       std::vector<geometry_msgs::Pose> &path_res, double v_max,
+  void interpolatePath(const std::vector<geometry_msgs::msg::Pose> &path,
+                       std::vector<geometry_msgs::msg::Pose> &path_res);
+  void interpolatePath(const std::vector<geometry_msgs::msg::Pose> &path,
+                       std::vector<geometry_msgs::msg::Pose> &path_res, double v_max,
                        double yaw_rate_max);
 
   // Track robot's status.
   ros::Subscriber status_sub_;
   ros::Subscriber wp_curr_sub_;
   ros::Publisher robot_status_pub_;
-  void statusCallback(const mav_msgs::Status &status);
-  void wpCurrCallback(const std_msgs::Int32 &wp);
+  void statusCallback(const mav_msgs::msg::Status &status);
+  void wpCurrCallback(const std_msgs::msg::Int32 &wp);
   void executionTimerCallback(const ros::TimerEvent& event);
-  void camPitchCallback(const sensor_msgs::JointState &state);
+  void camPitchCallback(const sensor_msgs::msg::JointState &state);
 
-  inline double diffPos(const geometry_msgs::Pose &p1, const geometry_msgs::Pose &p2) {
+  inline double diffPos(const geometry_msgs::msg::Pose &p1, const geometry_msgs::msg::Pose &p2) {
     return std::sqrt( (p1.position.x - p2.position.x) * (p1.position.x - p2.position.x) +
                       (p1.position.y - p2.position.y) * (p1.position.y - p2.position.y) +
                       (p1.position.z - p2.position.z) * (p1.position.z - p2.position.z));
@@ -318,10 +320,10 @@ class PCIGeneral : public PCIManager {
       x += 2 * M_PI;
   }
 
-  double calculateDistance(const geometry_msgs::Pose& p1, const geometry_msgs::Pose& p2);
-  double getEndPointDistanceAlongPath(const std::vector<geometry_msgs::Pose>& path);
+  double calculateDistance(const geometry_msgs::msg::Pose& p1, const geometry_msgs::msg::Pose& p2);
+  double getEndPointDistanceAlongPath(const std::vector<geometry_msgs::msg::Pose>& path);
 
-  bool reconnectPath(const std::vector<geometry_msgs::Pose> &path, std::vector<geometry_msgs::Pose> &path_new);
+  bool reconnectPath(const std::vector<geometry_msgs::msg::Pose> &path, std::vector<geometry_msgs::msg::Pose> &path_new);
 
 };
 
